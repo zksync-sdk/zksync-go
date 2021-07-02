@@ -6,7 +6,7 @@ import (
 )
 
 type Token struct {
-	Id       int    `json:"id"`
+	Id       uint32 `json:"id"`
 	Address  string `json:"address"`
 	Symbol   string `json:"symbol"`
 	Decimals int    `json:"decimals"`

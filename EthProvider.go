@@ -13,6 +13,7 @@ import (
 
 type EthProvider interface {
 	Deposit(*Token, *big.Int, common.Address) (*types.Transaction, error)
+	GetBalance() (*big.Int, error)
 }
 
 type DefaultEthProvider struct {
@@ -39,4 +40,11 @@ func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress 
 	} else {
 		return p.contract.DepositERC20(p.auth, token.GetAddress(), amount, userAddress)
 	}
+}
+
+func (p *DefaultEthProvider) GetBalance() (*big.Int, error) {
+	return p.client.BalanceAt(context.Background(), p.auth.From, nil) // latest
+}
+func (p *DefaultEthProvider) GetNonce() (uint64, error) {
+	return p.client.PendingNonceAt(context.Background(), p.auth.From) // pending
 }

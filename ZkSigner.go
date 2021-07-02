@@ -1,12 +1,16 @@
 package zksync
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/zksync-sdk/zksync-sdk-go"
 )
 
-const MESSAGE = "Access zkSync account.\n\nOnly sign this message for a trusted client!"
+const (
+	Message                 = "Access zkSync account.\n\nOnly sign this message for a trusted client!"
+	TransactionVersion byte = 0x01
+)
 
 func NewZkSignerFromSeed(seed []byte) (*ZkSigner, error) {
 	privateKey, err := zkscrypto.NewPrivateKey(seed)
@@ -34,9 +38,9 @@ func NewZkSignerFromRawPrivateKey(rawPk []byte) (*ZkSigner, error) {
 }
 
 func NewZkSignerFromEthSigner(es EthSigner, cid ChainId) (*ZkSigner, error) {
-	signMsg := MESSAGE
+	signMsg := Message
 	if cid != ChainIdMainnet {
-		signMsg = fmt.Sprintf("%s\nChain ID: %d.", MESSAGE, cid)
+		signMsg = fmt.Sprintf("%s\nChain ID: %d.", Message, cid)
 	}
 	sig, err := es.SignMessage([]byte(signMsg))
 	if err != nil {
@@ -59,10 +63,28 @@ func (s *ZkSigner) Sign(message []byte) (*zkscrypto.Signature, error) {
 	return signature, nil
 }
 
-func (s *ZkSigner) SignChangePubKey(message []byte) (*zkscrypto.Signature, error) {
+func (s *ZkSigner) SignChangePubKey(txData ChangePubKey) (*zkscrypto.Signature, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0xff - 0x07)
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(txData.AccountId))
+	buf.Write(txData.Account[:])
+	pkhBytes, err := pkhToBytes(txData.NewPkHash)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get pkh bytes")
+	}
+	buf.Write(pkhBytes)
+	buf.Write(Uint32ToBytes(txData.FeeToken))
+	//packedFee, err := packFee(txData.Fee)
+	//buf.Write(packedFee)
+
 	return nil, nil
 }
 
 func (s *ZkSigner) GetPublicKeyHash() string {
 	return "sync:" + s.publicKeyHash.HexString()
+}
+
+func (s *ZkSigner) GetPublicKey() string {
+	return s.publicKey.HexString()
 }

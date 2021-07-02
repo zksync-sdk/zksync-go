@@ -38,8 +38,8 @@ func NewEthSignerFromMnemonic(mnemonic string) (*DefaultEthSigner, error) {
 	}, nil
 }
 
-func (s *DefaultEthSigner) GetAddress() string {
-	return s.account.Address.String()
+func (s *DefaultEthSigner) GetAddress() common.Address {
+	return s.account.Address
 }
 
 func (s *DefaultEthSigner) SignMessage(msg []byte) ([]byte, error) {

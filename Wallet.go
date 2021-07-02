@@ -9,7 +9,7 @@ import (
 )
 
 type Wallet struct {
-	accountId  uint64
+	accountId  uint32
 	pubKeyHash string
 	zkSigner   *ZkSigner
 	ethSigner  EthSigner
@@ -30,7 +30,7 @@ func NewWallet(ethSigner EthSigner, zkSigner *ZkSigner, provider Provider) (*Wal
 	}, nil
 }
 
-func (w *Wallet) CreateEthereumProvider(client *ethclient.Client) (EthProvider, error) {
+func (w *Wallet) CreateEthereumProvider(client *ethclient.Client) (*DefaultEthProvider, error) {
 	contractAddress, err := w.provider.ContractAddress()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get contract address")
@@ -63,10 +63,11 @@ func (w *Wallet) SetSigningKey(fee TransactionFee, nonce uint64, onchainAuth boo
 		return "", errors.New("current signing key is already set")
 	}
 	if onchainAuth {
-		signedTx, err := w.buildSignedChangePubKeyTxOnchain(fee, nonce, timeRange)
+		//signedTx, err := w.buildSignedChangePubKeyTxOnchain(fee, nonce, timeRange)
 	} else {
 
 	}
+	return "", nil
 }
 
 func (w *Wallet) IsSigningKeySet() bool {
@@ -86,14 +87,16 @@ func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee TransactionFee, nonce uint
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get fee token")
 	}
-	changePubKey := &ChangePubKey{
-		AccountId: w.accountId,
-		Account:   w.ethSigner.GetAddress(),
-		NewPkHash: w.zkSigner.GetPublicKeyHash(),
-		Nonce:     nonce,
-		FeeToken:  token.Id,
-		Fee:       fee.Fee.String(),
-		//EthAuthData
-		TimeRange: timeRange,
+	//changePubKey := &ChangePubKey{
+	_ = &ChangePubKey{
+		AccountId:   w.accountId,
+		Account:     w.ethSigner.GetAddress(),
+		NewPkHash:   w.zkSigner.GetPublicKeyHash(),
+		Nonce:       nonce,
+		FeeToken:    token.Id,
+		Fee:         fee.Fee,
+		EthAuthData: ChangePubKeyAuthTypeOnchain,
+		TimeRange:   timeRange,
 	}
+	return nil, nil
 }

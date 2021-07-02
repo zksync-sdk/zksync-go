@@ -4,7 +4,7 @@ import "math/big"
 
 type AccountState struct {
 	Address    string           `json:"address"`
-	Id         uint64           `json:"id"`
+	Id         uint32           `json:"id"`
 	Depositing *DepositingState `json:"depositing"`
 	Committed  *State           `json:"committed"`
 	Verified   *State           `json:"verified"`
