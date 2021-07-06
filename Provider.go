@@ -10,6 +10,8 @@ type Provider interface {
 	GetTokens() (*Tokens, error)
 	ContractAddress() (*ContractAddress, error)
 	GetState(address common.Address) (*AccountState, error)
+	GetTransactionFee(txType TransactionType, address common.Address, token *Token) (*TransactionFeeDetails, error)
+	SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error)
 }
 
 func NewDefaultProvider(rawUrl string) (*DefaultProvider, error) {
@@ -70,20 +72,20 @@ func (p *DefaultProvider) GetState(address common.Address) (*AccountState, error
 	return res, nil
 }
 
-func (p *DefaultProvider) GetTransactionFee(txType string, address common.Address, token *Token) (*TransactionFeeDetails, error) {
+func (p *DefaultProvider) GetTransactionFee(txType TransactionType, address common.Address, token *Token) (*TransactionFeeDetails, error) {
 	res := new(TransactionFeeDetails)
-	err := p.client.Call(&res, "get_tx_fee", txType, address.String(), token.Symbol)
+	err := p.client.Call(&res, "get_tx_fee", txType.getType(), address.String(), token.Symbol)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to call `get_tx_fee` method")
 	}
 	return res, nil
 }
 
-func (p *DefaultProvider) SubmitTx(txType string, address common.Address, token *Token) (*TransactionFeeDetails, error) {
-	res := new(TransactionFeeDetails)
-	err := p.client.Call(&res, "tx_submit", txType, address.String(), token.Symbol)
+func (p *DefaultProvider) SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error) {
+	var res string
+	err := p.client.Call(&res, "tx_submit", signedTx, ethSignature, fastProcessing)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to call `get_tx_fee` method")
+		return "", errors.Wrap(err, "failed to call `tx_submit` method")
 	}
 	return res, nil
 }

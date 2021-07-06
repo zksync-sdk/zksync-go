@@ -1,34 +1,14 @@
 package zksync
 
-import (
-	"github.com/ethereum/go-ethereum/common"
-	"math/big"
-)
-
-type SignedChangePubKeyTxOnchain struct {
+type ZksTransaction interface {
+	getType() string
 }
 
-type ChangePubKey struct {
-	AccountId   uint32
-	Account     common.Address
-	NewPkHash   string // TODO []byte
-	FeeToken    uint32
-	Fee         *big.Int
-	Nonce       uint64
-	Signature   *Signature
-	EthAuthData ChangePubKeyAuthType
-	TimeRange   *TimeRange
+type SignedTransaction struct {
+	transaction       ZksTransaction
+	ethereumSignature *EthSignature
 }
 
-type Signature struct {
-	PubKey    string
-	Signature string
+func (tx *SignedTransaction) getTransaction() ZksTransaction {
+	return tx.transaction
 }
-
-type ChangePubKeyAuthType string
-
-const (
-	ChangePubKeyAuthTypeOnchain ChangePubKeyAuthType = `Onchain`
-	ChangePubKeyAuthTypeECDSA   ChangePubKeyAuthType = `ECDSA`
-	ChangePubKeyAuthTypeCREATE2 ChangePubKeyAuthType = `CREATE2`
-)

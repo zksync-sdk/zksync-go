@@ -21,7 +21,7 @@ type DepositingBalance struct {
 
 type State struct {
 	Balances   map[string]string `json:"balances"`
-	Nonce      uint64            `json:"nonce"`
+	Nonce      uint32            `json:"nonce"`
 	PubKeyHash string            `json:"pubKeyHash"`
 	// TODO NFTs
 	//Nfts       map[string]*NFT `json:"nfts"`

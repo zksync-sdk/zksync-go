@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/zksync-sdk/zksync-sdk-go"
+	"math/big"
 )
 
 const (
@@ -63,7 +64,7 @@ func (s *ZkSigner) Sign(message []byte) (*zkscrypto.Signature, error) {
 	return signature, nil
 }
 
-func (s *ZkSigner) SignChangePubKey(txData ChangePubKey) (*zkscrypto.Signature, error) {
+func (s *ZkSigner) SignChangePubKey(txData *ChangePubKey) (*Signature, error) {
 	buf := bytes.Buffer{}
 	buf.WriteByte(0xff - 0x07)
 	buf.WriteByte(TransactionVersion)
@@ -75,10 +76,27 @@ func (s *ZkSigner) SignChangePubKey(txData ChangePubKey) (*zkscrypto.Signature, 
 	}
 	buf.Write(pkhBytes)
 	buf.Write(Uint32ToBytes(txData.FeeToken))
-	//packedFee, err := packFee(txData.Fee)
-	//buf.Write(packedFee)
-
-	return nil, nil
+	fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+	if !ok {
+		return nil, errors.New("failed to convert string fee to big.Int")
+	}
+	packedFee, err := packFee(fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack fee")
+	}
+	buf.Write(packedFee)
+	buf.Write(Uint32ToBytes(txData.Nonce))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidFrom))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidUntil))
+	sig, err := s.Sign(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign ChangePubKey tx data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
 }
 
 func (s *ZkSigner) GetPublicKeyHash() string {

@@ -15,7 +15,13 @@ func (b *Bits) Len() uint {
 }
 
 func (b *Bits) SetBit(i uint, v bool) {
+	// len is not checked, can cause panic
 	b.bits[i] = v
+}
+
+func (b *Bits) GetBit(i uint) bool {
+	// len is not checked, can cause panic
+	return b.bits[i]
 }
 
 func (b *Bits) Clone() *Bits {
@@ -62,4 +68,18 @@ func (b *Bits) ToBytesBE() ([]byte, error) {
 		}
 	}
 	return res, nil
+}
+
+func (b *Bits) FromBytesBE(bytes []byte) *Bits {
+	for i, v := range bytes {
+		b.SetBit(uint(i*8+0), v&0x80 > 0)
+		b.SetBit(uint(i*8+1), v&0x40 > 0)
+		b.SetBit(uint(i*8+2), v&0x20 > 0)
+		b.SetBit(uint(i*8+3), v&0x10 > 0)
+		b.SetBit(uint(i*8+4), v&0x08 > 0)
+		b.SetBit(uint(i*8+5), v&0x04 > 0)
+		b.SetBit(uint(i*8+6), v&0x02 > 0)
+		b.SetBit(uint(i*8+7), v&0x01 > 0)
+	}
+	return b
 }

@@ -1,8 +1,8 @@
 package zksync
 
 type TimeRange struct {
-	ValidFrom  uint32 `json:"validFrom"`
-	ValidUntil uint32 `json:"validUntil"`
+	ValidFrom  uint64 `json:"validFrom"`
+	ValidUntil uint64 `json:"validUntil"`
 }
 
 func DefaultTimeRange() *TimeRange {
