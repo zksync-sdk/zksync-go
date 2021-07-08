@@ -47,14 +47,22 @@ func (s *DefaultEthSigner) GetAddress() common.Address {
 }
 
 func (s *DefaultEthSigner) SignMessage(msg []byte) ([]byte, error) {
-	return s.wallet.SignText(s.account, msg) // prefixed
+	sig, err := s.wallet.SignText(s.account, msg) // prefixed
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign message by wallet")
+	}
+	// set recovery byte to 27/28
+	if len(sig) == 65 {
+		sig[64] += 27
+	}
+	return sig, nil
 }
 
 func (s *DefaultEthSigner) SignAuth(txData *ChangePubKey) (*ChangePubKeyECDSA, error) {
 	auth := &ChangePubKeyECDSA{
 		Type:         ChangePubKeyAuthTypeECDSA,
 		EthSignature: "",
-		BatchHash:    hex.EncodeToString(make([]byte, 32)),
+		BatchHash:    "0x" + hex.EncodeToString(make([]byte, 32)),
 	}
 	txData.EthAuthData = auth
 	msg, err := getChangePubKeyData(txData)
@@ -65,7 +73,7 @@ func (s *DefaultEthSigner) SignAuth(txData *ChangePubKey) (*ChangePubKeyECDSA, e
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to sign ChangePubKeyECDSA msg")
 	}
-	auth.EthSignature = hex.EncodeToString(sig)
+	auth.EthSignature = "0x" + hex.EncodeToString(sig)
 	return auth, nil
 }
 
@@ -82,8 +90,8 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 				return nil, errors.Wrap(err, "failed to sign ChangePubKey tx")
 			}
 			return &EthSignature{
-				sigType:   EthSignatureTypeEth,
-				signature: hex.EncodeToString(sig),
+				Type:      EthSignatureTypeEth,
+				Signature: "0x" + hex.EncodeToString(sig),
 			}, nil
 		}
 	}
@@ -102,6 +110,6 @@ const (
 )
 
 type EthSignature struct {
-	sigType   EthSignatureType
-	signature string
+	Type      EthSignatureType `json:"type"`
+	Signature string           `json:"signature"`
 }

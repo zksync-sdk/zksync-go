@@ -147,6 +147,7 @@ func (w *Wallet) buildSignedChangePubKeyTxSigned(fee *TransactionFee, nonce uint
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
+	txData.Signature, err = w.zkSigner.SignChangePubKey(txData)
 	return &SignedTransaction{
 		transaction:       txData,
 		ethereumSignature: ethSig,

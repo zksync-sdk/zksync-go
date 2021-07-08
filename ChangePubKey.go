@@ -58,7 +58,7 @@ func (t *ChangePubKeyECDSA) getType() ChangePubKeyAuthType {
 }
 
 func (t *ChangePubKeyECDSA) getBytes() []byte {
-	res, _ := hex.DecodeString(t.BatchHash)
+	res, _ := hex.DecodeString(t.BatchHash[2:])
 	return res
 }
 
