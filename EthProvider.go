@@ -13,33 +13,33 @@ import (
 
 type EthProvider interface {
 	Deposit(*Token, *big.Int, common.Address) (*types.Transaction, error)
+	SetAuthPubkeyHash(string, uint32) (*types.Transaction, error)
 	GetBalance() (*big.Int, error)
 }
 
 type DefaultEthProvider struct {
 	client   *ethclient.Client
 	contract *ZkSync.ZkSync
-	auth     *bind.TransactOpts // thread unsafe usage, TODO fix it somehow
+	auth     *bind.TransactOpts
 }
 
 func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress common.Address) (*types.Transaction, error) {
-	nonce, err := p.client.PendingNonceAt(context.Background(), userAddress)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get pending nonce")
-	}
-	gasPrice, err := p.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get suggested gas price")
-	}
-	p.auth.Nonce = big.NewInt(int64(nonce))
-	p.auth.Value = amount
-	p.auth.GasLimit = uint64(3000000) // in units
-	p.auth.GasPrice = gasPrice
+	auth := p.getAuth()
+	auth.Value = amount
 	if token.IsETH() {
-		return p.contract.DepositETH(p.auth, userAddress)
+		return p.contract.DepositETH(auth, userAddress)
 	} else {
-		return p.contract.DepositERC20(p.auth, token.GetAddress(), amount, userAddress)
+		return p.contract.DepositERC20(auth, token.GetAddress(), amount, userAddress)
 	}
+}
+
+func (p *DefaultEthProvider) SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32) (*types.Transaction, error) {
+	auth := p.getAuth()
+	pkh, err := pkhToBytes(pubKeyHash)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid pubKeyHash value")
+	}
+	return p.contract.SetAuthPubkeyHash(auth, pkh, zkNonce)
 }
 
 func (p *DefaultEthProvider) GetBalance() (*big.Int, error) {
@@ -47,4 +47,12 @@ func (p *DefaultEthProvider) GetBalance() (*big.Int, error) {
 }
 func (p *DefaultEthProvider) GetNonce() (uint64, error) {
 	return p.client.PendingNonceAt(context.Background(), p.auth.From) // pending
+}
+
+// getAuth make a new copy of origin TransactOpts to be used safely for each call
+func (p *DefaultEthProvider) getAuth() *bind.TransactOpts {
+	return &bind.TransactOpts{
+		From:   p.auth.From,
+		Signer: p.auth.Signer,
+	}
 }

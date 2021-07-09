@@ -34,8 +34,23 @@ func NewZkSignerFromSeed(seed []byte) (*ZkSigner, error) {
 }
 
 func NewZkSignerFromRawPrivateKey(rawPk []byte) (*ZkSigner, error) {
-	// TODO
-	return nil, errors.New("can't implement due to private zkscrypto.PrivateKey data field")
+	privateKey, err := zkscrypto.NewPrivateKeyRaw(rawPk)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create private key from raw bytes")
+	}
+	publicKey, err := privateKey.PublicKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create public key")
+	}
+	publicKeyHash, err := publicKey.Hash()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get public key hash")
+	}
+	return &ZkSigner{
+		privateKey:    privateKey,
+		publicKey:     publicKey,
+		publicKeyHash: publicKeyHash,
+	}, nil
 }
 
 func NewZkSignerFromEthSigner(es EthSigner, cid ChainId) (*ZkSigner, error) {

@@ -2,18 +2,6 @@ package zksync
 
 import "math/big"
 
-type TransactionType string
-
-func (t TransactionType) getType() interface{} {
-	switch t {
-	case TransactionTypeChangePubKeyOnchain, TransactionTypeChangePubKeyECDSA, TransactionTypeChangePubKeyCREATE2:
-		// custom object instead of string
-		return TransactionTypeChangePubKey{ChangePubKey: string(t)}
-	default:
-		return string(t)
-	}
-}
-
 type TransactionTypeChangePubKey struct {
 	ChangePubKey string `json:"ChangePubKey"`
 }
