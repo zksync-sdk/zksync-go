@@ -3,13 +3,14 @@ package zksync
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"math/big"
 )
 
 type Token struct {
 	Id       uint32 `json:"id"`
 	Address  string `json:"address"`
 	Symbol   string `json:"symbol"`
-	Decimals int    `json:"decimals"`
+	Decimals uint   `json:"decimals"`
 	IsNft    bool   `json:"is_nft"`
 }
 
@@ -28,6 +29,13 @@ func (t Token) IsETH() bool {
 
 func (t Token) GetAddress() common.Address {
 	return common.HexToAddress(t.Address)
+}
+
+func (t Token) ToBigFloat(amount *big.Int) *big.Float {
+	af := big.NewFloat(0).SetInt(amount)
+	div := big.NewFloat(0).SetInt(big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil))
+	res := big.NewFloat(0).SetPrec(t.Decimals*8).Quo(af, div)
+	return res
 }
 
 type Tokens struct {

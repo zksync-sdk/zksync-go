@@ -94,6 +94,32 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 				Signature: "0x" + hex.EncodeToString(sig),
 			}, nil
 		}
+	case "Transfer":
+		if txData, ok := tx.(*Transfer); ok {
+			var tokenToUse *Token
+			if txData.Token != nil {
+				tokenToUse = txData.Token
+			} else {
+				tokenToUse = token
+			}
+			fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+			if !ok {
+				return nil, errors.New("failed to convert string fee to big.Int")
+			}
+			msg, err := getTransferMessagePart(txData.To.String(), txData.Amount, fee, tokenToUse)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get Transfer message part")
+			}
+			msg += "\n" + getNonceMessagePart(nonce)
+			sig, err := s.SignMessage([]byte(msg))
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to sign Transfer tx")
+			}
+			return &EthSignature{
+				Type:      EthSignatureTypeEth,
+				Signature: "0x" + hex.EncodeToString(sig),
+			}, nil
+		}
 	}
 	return nil, errors.New("unknown tx type")
 }

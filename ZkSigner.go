@@ -114,6 +114,42 @@ func (s *ZkSigner) SignChangePubKey(txData *ChangePubKey) (*Signature, error) {
 	return res, nil
 }
 
+func (s *ZkSigner) SignTransfer(txData *Transfer) (*Signature, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0xff - 0x05)
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(txData.AccountId))
+	buf.Write(txData.From[:])
+	buf.Write(txData.To[:])
+	buf.Write(Uint32ToBytes(txData.Token.Id))
+	packedAmount, err := packAmount(txData.Amount)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack amount")
+	}
+	buf.Write(packedAmount)
+	fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+	if !ok {
+		return nil, errors.New("failed to convert string fee to big.Int")
+	}
+	packedFee, err := packFee(fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack fee")
+	}
+	buf.Write(packedFee)
+	buf.Write(Uint32ToBytes(txData.Nonce))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidFrom))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidUntil))
+	sig, err := s.Sign(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign Transfer tx data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
+}
+
 func (s *ZkSigner) GetPublicKeyHash() string {
 	return "sync:" + s.publicKeyHash.HexString()
 }

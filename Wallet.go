@@ -3,9 +3,11 @@ package zksync
 import (
 	"context"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"github.com/zksync-sdk/zksync-go/contracts/ZkSync"
+	"math/big"
 )
 
 type Wallet struct {
@@ -89,8 +91,12 @@ func (w *Wallet) IsSigningKeySet() bool {
 	return w.pubKeyHash == w.zkSigner.GetPublicKeyHash()
 }
 
-func (w *Wallet) SyncTransfer(fee *TransactionFee, nonce uint64, timeRange *TimeRange) {
-
+func (w *Wallet) SyncTransfer(to common.Address, amount *big.Int, fee *TransactionFee, nonce uint32, timeRange *TimeRange) (string, error) {
+	signedTx, err := w.buildSignedTransferTx(to, amount, fee, nonce, timeRange)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to build signed Transfer tx")
+	}
+	return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, false)
 }
 
 func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee *TransactionFee, nonce uint32, timeRange *TimeRange) (*SignedTransaction, error) {
@@ -148,6 +154,38 @@ func (w *Wallet) buildSignedChangePubKeyTxSigned(fee *TransactionFee, nonce uint
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignChangePubKey(txData)
+	return &SignedTransaction{
+		transaction:       txData,
+		ethereumSignature: ethSig,
+	}, nil
+}
+
+func (w *Wallet) buildSignedTransferTx(to common.Address, amount *big.Int, fee *TransactionFee, nonce uint32, timeRange *TimeRange) (*SignedTransaction, error) {
+	tokens, err := w.provider.GetTokens()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get tokens")
+	}
+	token, err := tokens.GetToken(fee.FeeToken)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get fee token")
+	}
+	txData := &Transfer{
+		Type:      "Transfer",
+		AccountId: w.accountId,
+		From:      w.ethSigner.GetAddress(),
+		To:        to,
+		Token:     token,
+		TokenId:   token.Id,
+		Amount:    amount,
+		Nonce:     nonce,
+		Fee:       fee.Fee.String(),
+		TimeRange: timeRange,
+	}
+	ethSig, err := w.ethSigner.SignTransaction(txData, nonce, token, fee.Fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of transaction")
+	}
+	txData.Signature, err = w.zkSigner.SignTransfer(txData)
 	return &SignedTransaction{
 		transaction:       txData,
 		ethereumSignature: ethSig,

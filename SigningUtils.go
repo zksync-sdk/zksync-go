@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"github.com/pkg/errors"
 	"math/big"
+	"strings"
 )
 
 const (
-	FeeExponentBitWidth int64 = 5
-	FeeMantissaBitWidth int64 = 11
+	AmountExponentBitWidth int64 = 5
+	AmountMantissaBitWidth int64 = 35
+	FeeExponentBitWidth    int64 = 5
+	FeeMantissaBitWidth    int64 = 11
 )
 
 func Uint32ToBytes(v uint32) []byte {
@@ -51,6 +55,20 @@ func packFee(fee *big.Int) ([]byte, error) {
 		return nil, errors.New("fee Amount is not packable")
 	}
 	return packedFee, nil
+}
+
+func packAmount(amount *big.Int) ([]byte, error) {
+	packedAmount, err := integerToDecimalByteArray(amount, AmountExponentBitWidth, AmountMantissaBitWidth, 10)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack amount")
+	}
+	// check that unpacked amount still has same value
+	if unpackedFee, err := decimalByteArrayToInteger(packedAmount, AmountExponentBitWidth, AmountMantissaBitWidth, 10); err != nil {
+		return nil, errors.Wrap(err, "failed to unpack amount")
+	} else if unpackedFee.Cmp(amount) != 0 {
+		return nil, errors.New("amount Amount is not packable")
+	}
+	return packedAmount, nil
 }
 
 func integerToDecimalByteArray(value *big.Int, expBits, mantissaBits, expBase int64) ([]byte, error) {
@@ -129,4 +147,22 @@ func getChangePubKeyData(txData *ChangePubKey) ([]byte, error) {
 	buf.Write(Uint32ToBytes(txData.AccountId))
 	buf.Write(txData.EthAuthData.getBytes())
 	return buf.Bytes(), nil
+}
+
+func getTransferMessagePart(to string, amount, fee *big.Int, token *Token) (string, error) {
+	var res string
+	if big.NewInt(0).Cmp(amount) != 0 {
+		res = fmt.Sprintf("Transfer %s %s to: %s", token.ToBigFloat(amount).Text('f', -int(token.Decimals)), token.Symbol, strings.ToLower(to))
+	}
+	if fee.Cmp(big.NewInt(0)) > 0 {
+		if len(res) > 0 {
+			res += "\n"
+		}
+		res += fmt.Sprintf("Fee: %s %s", token.ToBigFloat(fee).Text('f', -int(token.Decimals)), token.Symbol)
+	}
+	return res, nil
+}
+
+func getNonceMessagePart(nonce uint32) string {
+	return fmt.Sprintf("Nonce: %d", nonce)
 }

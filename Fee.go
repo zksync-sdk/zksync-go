@@ -2,16 +2,6 @@ package zksync
 
 import "math/big"
 
-type TransactionTypeChangePubKey struct {
-	ChangePubKey string `json:"ChangePubKey"`
-}
-
-const (
-	TransactionTypeChangePubKeyOnchain TransactionType = "Onchain"
-	TransactionTypeChangePubKeyECDSA   TransactionType = "ECDSA"
-	TransactionTypeChangePubKeyCREATE2 TransactionType = "CREATE2"
-)
-
 type TransactionFeeDetails struct {
 	GasTxAmount string `json:"gasTxAmount"`
 	GasPriceWei string `json:"gasPriceWei"`

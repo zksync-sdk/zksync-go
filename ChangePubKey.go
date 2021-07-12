@@ -5,6 +5,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+type TransactionTypeChangePubKey struct {
+	ChangePubKey string `json:"ChangePubKey"`
+}
+
+const (
+	TransactionTypeChangePubKeyOnchain TransactionType = "Onchain"
+	TransactionTypeChangePubKeyECDSA   TransactionType = "ECDSA"
+	TransactionTypeChangePubKeyCREATE2 TransactionType = "CREATE2"
+)
+
 type ChangePubKey struct {
 	Type        string              `json:"type"`
 	AccountId   uint32              `json:"accountId"`
