@@ -120,6 +120,22 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 				Signature: "0x" + hex.EncodeToString(sig),
 			}, nil
 		}
+	case "Withdraw":
+		if txData, ok := tx.(*Withdraw); ok {
+			msg, err := getWithdrawMessagePart(txData.To.String(), txData.Amount, fee, token)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get Withdraw message part")
+			}
+			msg += "\n" + getNonceMessagePart(nonce)
+			sig, err := s.SignMessage([]byte(msg))
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to sign Transfer tx")
+			}
+			return &EthSignature{
+				Type:      EthSignatureTypeEth,
+				Signature: "0x" + hex.EncodeToString(sig),
+			}, nil
+		}
 	}
 	return nil, errors.New("unknown tx type")
 }

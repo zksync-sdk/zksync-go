@@ -99,6 +99,14 @@ func (w *Wallet) SyncTransfer(to common.Address, amount *big.Int, fee *Transacti
 	return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, false)
 }
 
+func (w *Wallet) SyncWithdraw(ethAddress common.Address, amount *big.Int, fee *TransactionFee, nonce uint32, fastProcessing bool, timeRange *TimeRange) (string, error) {
+	signedTx, err := w.buildSignedWithdrawTx(ethAddress, fee.FeeToken, amount, fee, nonce, timeRange)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to build signed Withdraw tx")
+	}
+	return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, fastProcessing)
+}
+
 func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee *TransactionFee, nonce uint32, timeRange *TimeRange) (*SignedTransaction, error) {
 	tokens, err := w.provider.GetTokens()
 	if err != nil {
@@ -186,6 +194,37 @@ func (w *Wallet) buildSignedTransferTx(to common.Address, amount *big.Int, fee *
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignTransfer(txData)
+	return &SignedTransaction{
+		transaction:       txData,
+		ethereumSignature: ethSig,
+	}, nil
+}
+
+func (w *Wallet) buildSignedWithdrawTx(to common.Address, tokenId string, amount *big.Int, fee *TransactionFee, nonce uint32, timeRange *TimeRange) (*SignedTransaction, error) {
+	tokens, err := w.provider.GetTokens()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get tokens")
+	}
+	token, err := tokens.GetToken(tokenId)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get fee token")
+	}
+	txData := &Withdraw{
+		Type:      "Withdraw",
+		AccountId: w.accountId,
+		From:      w.ethSigner.GetAddress(),
+		To:        to,
+		TokenId:   token.Id,
+		Amount:    amount,
+		Nonce:     nonce,
+		Fee:       fee.Fee.String(),
+		TimeRange: timeRange,
+	}
+	ethSig, err := w.ethSigner.SignTransaction(txData, nonce, token, fee.Fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of transaction")
+	}
+	txData.Signature, err = w.zkSigner.SignWithdraw(txData)
 	return &SignedTransaction{
 		transaction:       txData,
 		ethereumSignature: ethSig,
