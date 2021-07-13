@@ -32,6 +32,42 @@ func NewWallet(ethSigner EthSigner, zkSigner *ZkSigner, provider Provider) (*Wal
 	}, nil
 }
 
+func (w *Wallet) loadAccountInfo() error {
+	state, err := w.provider.GetState(w.ethSigner.GetAddress())
+	if err != nil {
+		return errors.Wrap(err, "failed to get account state")
+	}
+	w.accountId = state.Id
+	w.pubKeyHash = state.Committed.PubKeyHash
+	return nil
+}
+
+func (w *Wallet) GetAccountId() (uint32, error) {
+	if w.accountId == 0 {
+		if err := w.loadAccountInfo(); err != nil {
+			return 0, err
+		}
+	}
+	return w.accountId, nil
+}
+
+func (w *Wallet) GetPubKeyHash() (string, error) {
+	if len(w.pubKeyHash) == 0 {
+		if err := w.loadAccountInfo(); err != nil {
+			return "", err
+		}
+	}
+	return w.pubKeyHash, nil
+}
+
+func (w *Wallet) GetAddress() common.Address {
+	return w.ethSigner.GetAddress()
+}
+
+func (w *Wallet) GetTokens() (*Tokens, error) {
+	return w.provider.GetTokens()
+}
+
 func (w *Wallet) GetState() (*AccountState, error) {
 	state, err := w.provider.GetState(w.ethSigner.GetAddress())
 	if err != nil {
