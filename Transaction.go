@@ -24,3 +24,16 @@ type SignedTransaction struct {
 func (tx *SignedTransaction) getTransaction() ZksTransaction {
 	return tx.transaction
 }
+
+type TransactionDetails struct {
+	Executed   bool       `json:"executed"`
+	Success    bool       `json:"success"`
+	FailReason string     `json:"failReason"`
+	Block      *BlockInfo `json:"block"`
+}
+
+type BlockInfo struct {
+	BlockNumber uint64 `json:"blockNumber"`
+	Committed   bool   `json:"committed"`
+	Verified    bool   `json:"verified"`
+}

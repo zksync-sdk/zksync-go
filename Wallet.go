@@ -40,6 +40,10 @@ func (w *Wallet) GetState() (*AccountState, error) {
 	return state, nil
 }
 
+func (w *Wallet) GetProvider() Provider {
+	return w.provider
+}
+
 func (w *Wallet) CreateEthereumProvider(client *ethclient.Client) (*DefaultEthProvider, error) {
 	contractAddress, err := w.provider.ContractAddress()
 	if err != nil {

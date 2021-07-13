@@ -12,6 +12,7 @@ type Provider interface {
 	GetState(address common.Address) (*AccountState, error)
 	GetTransactionFee(txType TransactionType, address common.Address, token *Token) (*TransactionFeeDetails, error)
 	SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error)
+	GetTransactionDetails(txHash string) (*TransactionDetails, error)
 }
 
 func NewDefaultProvider(rawUrl string) (*DefaultProvider, error) {
@@ -77,6 +78,15 @@ func (p *DefaultProvider) GetTransactionFee(txType TransactionType, address comm
 	err := p.client.Call(&res, "get_tx_fee", txType.getType(), address.String(), token.Symbol)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to call `get_tx_fee` method")
+	}
+	return res, nil
+}
+
+func (p *DefaultProvider) GetTransactionDetails(txHash string) (*TransactionDetails, error) {
+	res := new(TransactionDetails)
+	err := p.client.Call(&res, "tx_info", txHash)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to call `tx_info` method")
 	}
 	return res, nil
 }
