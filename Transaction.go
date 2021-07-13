@@ -37,3 +37,8 @@ type BlockInfo struct {
 	Committed   bool   `json:"committed"`
 	Verified    bool   `json:"verified"`
 }
+
+type EthOpInfo struct {
+	Executed bool       `json:"executed"`
+	Block    *BlockInfo `json:"block"`
+}

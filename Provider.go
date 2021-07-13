@@ -4,15 +4,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+	"math/big"
 )
 
 type Provider interface {
 	GetTokens() (*Tokens, error)
+	UpdateTokenSet() error
+	GetTokenPrice(token *Token) (*big.Float, error)
 	ContractAddress() (*ContractAddress, error)
 	GetState(address common.Address) (*AccountState, error)
 	GetTransactionFee(txType TransactionType, address common.Address, token *Token) (*TransactionFeeDetails, error)
 	SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error)
 	GetTransactionDetails(txHash string) (*TransactionDetails, error)
+	GetConfirmationsForEthOpAmount() (*big.Int, error)
+	GetEthOpInfo(priority uint64) (*EthOpInfo, error)
 }
 
 func NewDefaultProvider(rawUrl string) (*DefaultProvider, error) {
@@ -42,17 +47,41 @@ func NewDefaultProviderFor(cid ChainId) (*DefaultProvider, error) {
 
 type DefaultProvider struct {
 	client *rpc.Client
+	tokens *Tokens
 }
 
 func (p *DefaultProvider) GetTokens() (*Tokens, error) {
+	if p.tokens == nil {
+		if err := p.UpdateTokenSet(); err != nil {
+			return nil, errors.Wrap(err, "failed to get tokens")
+		}
+	}
+	return p.tokens, nil
+}
+
+func (p *DefaultProvider) UpdateTokenSet() error {
 	res := make(map[string]*Token)
 	err := p.client.Call(&res, "tokens")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to call `tokens` method")
+		return errors.Wrap(err, "failed to call `tokens` method")
 	}
-	return &Tokens{
+	p.tokens = &Tokens{
 		Tokens: res,
-	}, nil
+	}
+	return nil
+}
+
+func (p *DefaultProvider) GetTokenPrice(token *Token) (*big.Float, error) {
+	var resp string
+	err := p.client.Call(&resp, "get_token_price", token.Symbol)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to call `get_token_price` method")
+	}
+	res, ok := big.NewFloat(0).SetString(resp)
+	if !ok {
+		return nil, errors.Wrap(err, "failed to parse response")
+	}
+	return res, nil
 }
 
 func (p *DefaultProvider) ContractAddress() (*ContractAddress, error) {
@@ -96,6 +125,24 @@ func (p *DefaultProvider) SubmitTx(signedTx ZksTransaction, ethSignature *EthSig
 	err := p.client.Call(&res, "tx_submit", signedTx, ethSignature, fastProcessing)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to call `tx_submit` method")
+	}
+	return res, nil
+}
+
+func (p *DefaultProvider) GetConfirmationsForEthOpAmount() (*big.Int, error) {
+	var resp int64
+	err := p.client.Call(&resp, "get_confirmations_for_eth_op_amount")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to call `get_confirmations_for_eth_op_amount` method")
+	}
+	return big.NewInt(resp), nil
+}
+
+func (p *DefaultProvider) GetEthOpInfo(priority uint64) (*EthOpInfo, error) {
+	res := new(EthOpInfo)
+	err := p.client.Call(&res, "ethop_info", priority)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to call `ethop_info` method")
 	}
 	return res, nil
 }
