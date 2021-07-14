@@ -172,6 +172,15 @@ func getWithdrawMessagePart(to string, amount, fee *big.Int, token *Token) (stri
 	return res, nil
 }
 
+func getForcedExitMessagePart(to string, fee *big.Int, token *Token) (string, error) {
+	var res string
+	res = fmt.Sprintf("ForcedExit %s to: %s", token.Symbol, strings.ToLower(to))
+	if fee.Cmp(big.NewInt(0)) > 0 {
+		res += fmt.Sprintf("\nFee: %s %s", token.ToBigFloat(fee).Text('f', -int(token.Decimals)), token.Symbol)
+	}
+	return res, nil
+}
+
 func getNonceMessagePart(nonce uint32) string {
 	return fmt.Sprintf("Nonce: %d", nonce)
 }

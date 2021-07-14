@@ -3,6 +3,7 @@ package zksync
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/miguelmota/go-ethereum-hdwallet"
@@ -24,11 +25,15 @@ type DefaultEthSigner struct {
 }
 
 func NewEthSignerFromMnemonic(mnemonic string) (*DefaultEthSigner, error) {
+	return NewEthSignerFromMnemonicAndAccountId(mnemonic, 0)
+}
+
+func NewEthSignerFromMnemonicAndAccountId(mnemonic string, accountId uint32) (*DefaultEthSigner, error) {
 	wallet, err := hdwallet.NewFromMnemonic(mnemonic)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create HD wallet from mnemonic")
 	}
-	path, err := accounts.ParseDerivationPath("m/44'/60'/0'/0/0")
+	path, err := accounts.ParseDerivationPath(fmt.Sprintf("m/44'/60'/0'/0/%d", accountId))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse derivation path")
 	}
@@ -125,6 +130,22 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 			msg, err := getWithdrawMessagePart(txData.To.String(), txData.Amount, fee, token)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get Withdraw message part")
+			}
+			msg += "\n" + getNonceMessagePart(nonce)
+			sig, err := s.SignMessage([]byte(msg))
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to sign Transfer tx")
+			}
+			return &EthSignature{
+				Type:      EthSignatureTypeEth,
+				Signature: "0x" + hex.EncodeToString(sig),
+			}, nil
+		}
+	case "ForcedExit":
+		if txData, ok := tx.(*ForcedExit); ok {
+			msg, err := getForcedExitMessagePart(txData.Target.String(), fee, token)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get ForcedExit message part")
 			}
 			msg += "\n" + getNonceMessagePart(nonce)
 			sig, err := s.SignMessage([]byte(msg))

@@ -18,19 +18,7 @@ func NewZkSignerFromSeed(seed []byte) (*ZkSigner, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create private key")
 	}
-	publicKey, err := privateKey.PublicKey()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create public key")
-	}
-	publicKeyHash, err := publicKey.Hash()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get public key hash")
-	}
-	return &ZkSigner{
-		privateKey:    privateKey,
-		publicKey:     publicKey,
-		publicKeyHash: publicKeyHash,
-	}, nil
+	return newZkSignerFromPrivateKey(privateKey)
 }
 
 func NewZkSignerFromRawPrivateKey(rawPk []byte) (*ZkSigner, error) {
@@ -38,19 +26,7 @@ func NewZkSignerFromRawPrivateKey(rawPk []byte) (*ZkSigner, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create private key from raw bytes")
 	}
-	publicKey, err := privateKey.PublicKey()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create public key")
-	}
-	publicKeyHash, err := publicKey.Hash()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get public key hash")
-	}
-	return &ZkSigner{
-		privateKey:    privateKey,
-		publicKey:     publicKey,
-		publicKeyHash: publicKeyHash,
-	}, nil
+	return newZkSignerFromPrivateKey(privateKey)
 }
 
 func NewZkSignerFromEthSigner(es EthSigner, cid ChainId) (*ZkSigner, error) {
@@ -63,6 +39,22 @@ func NewZkSignerFromEthSigner(es EthSigner, cid ChainId) (*ZkSigner, error) {
 		return nil, errors.Wrap(err, "failed to sign special message")
 	}
 	return NewZkSignerFromSeed(sig)
+}
+
+func newZkSignerFromPrivateKey(privateKey *zkscrypto.PrivateKey) (*ZkSigner, error) {
+	publicKey, err := privateKey.PublicKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create public key")
+	}
+	publicKeyHash, err := publicKey.Hash()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get public key hash")
+	}
+	return &ZkSigner{
+		privateKey:    privateKey,
+		publicKey:     publicKey,
+		publicKeyHash: publicKeyHash,
+	}, nil
 }
 
 type ZkSigner struct {
@@ -176,6 +168,36 @@ func (s *ZkSigner) SignWithdraw(txData *Withdraw) (*Signature, error) {
 	sig, err := s.Sign(buf.Bytes())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to sign Withdraw tx data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
+}
+
+func (s *ZkSigner) SignForcedExit(txData *ForcedExit) (*Signature, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0xff - 0x08)
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(txData.AccountId))
+	buf.Write(txData.Target[:])
+	buf.Write(Uint32ToBytes(txData.TokenId))
+	fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+	if !ok {
+		return nil, errors.New("failed to convert string fee to big.Int")
+	}
+	packedFee, err := packFee(fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack fee")
+	}
+	buf.Write(packedFee)
+	buf.Write(Uint32ToBytes(txData.Nonce))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidFrom))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidUntil))
+	sig, err := s.Sign(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign ForcedExit tx data")
 	}
 	res := &Signature{
 		PubKey:    s.GetPublicKey(),

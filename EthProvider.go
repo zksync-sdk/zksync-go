@@ -12,9 +12,12 @@ import (
 )
 
 type EthProvider interface {
-	Deposit(*Token, *big.Int, common.Address) (*types.Transaction, error)
-	SetAuthPubkeyHash(string, uint32) (*types.Transaction, error)
+	Deposit(token *Token, amount *big.Int, userAddress common.Address, options *GasOptions) (*types.Transaction, error)
+	SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32, options *GasOptions) (*types.Transaction, error)
 	GetBalance() (*big.Int, error)
+	GetNonce() (uint64, error)
+	Withdraw(token *Token, amount *big.Int, options *GasOptions) (*types.Transaction, error)
+	FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error)
 }
 
 type DefaultEthProvider struct {
@@ -23,8 +26,13 @@ type DefaultEthProvider struct {
 	auth     *bind.TransactOpts
 }
 
-func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress common.Address) (*types.Transaction, error) {
-	auth := p.getAuth()
+type GasOptions struct {
+	GasPrice *big.Int // Gas price to use for the transaction execution (nil = gas price oracle)
+	GasLimit uint64   // Gas limit to set for the transaction execution (0 = estimate)
+}
+
+func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress common.Address, options *GasOptions) (*types.Transaction, error) {
+	auth := p.getAuth(options)
 	auth.Value = amount
 	if token.IsETH() {
 		return p.contract.DepositETH(auth, userAddress)
@@ -33,8 +41,8 @@ func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress 
 	}
 }
 
-func (p *DefaultEthProvider) SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32) (*types.Transaction, error) {
-	auth := p.getAuth()
+func (p *DefaultEthProvider) SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32, options *GasOptions) (*types.Transaction, error) {
+	auth := p.getAuth(options)
 	pkh, err := pkhToBytes(pubKeyHash)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pubKeyHash value")
@@ -49,10 +57,29 @@ func (p *DefaultEthProvider) GetNonce() (uint64, error) {
 	return p.client.PendingNonceAt(context.Background(), p.auth.From) // pending
 }
 
+func (p *DefaultEthProvider) Withdraw(token *Token, amount *big.Int, options *GasOptions) (*types.Transaction, error) {
+	auth := p.getAuth(options)
+	if token.IsETH() {
+		return p.contract.WithdrawETH(auth, amount)
+	} else {
+		return p.contract.WithdrawERC20(auth, token.GetAddress(), amount)
+	}
+}
+
+func (p *DefaultEthProvider) FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error) {
+	auth := p.getAuth(options)
+	return p.contract.FullExit(auth, accountId, token.GetAddress())
+}
+
 // getAuth make a new copy of origin TransactOpts to be used safely for each call
-func (p *DefaultEthProvider) getAuth() *bind.TransactOpts {
-	return &bind.TransactOpts{
+func (p *DefaultEthProvider) getAuth(options *GasOptions) *bind.TransactOpts {
+	newAuth := &bind.TransactOpts{
 		From:   p.auth.From,
 		Signer: p.auth.Signer,
 	}
+	if options != nil {
+		newAuth.GasPrice = options.GasPrice
+		newAuth.GasLimit = options.GasLimit
+	}
+	return newAuth
 }
