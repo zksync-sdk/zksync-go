@@ -104,6 +104,7 @@ func (w *Wallet) CreateEthereumProvider(client *ethclient.Client) (*DefaultEthPr
 	return &DefaultEthProvider{
 		client:   client,
 		contract: contract,
+		address:  contractAddress.GetMainAddress(),
 		auth:     auth,
 	}, nil
 }
