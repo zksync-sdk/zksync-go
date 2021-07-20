@@ -17,9 +17,9 @@ type EthProvider interface {
 	IsDepositApproved(token *Token, userAddress common.Address, threshold *big.Int) (bool, error)
 	Deposit(token *Token, amount *big.Int, userAddress common.Address, options *GasOptions) (*types.Transaction, error)
 	SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32, options *GasOptions) (*types.Transaction, error)
+	IsOnChainAuthPubkeyHashSet(nonce uint32) (bool, error)
 	GetBalance() (*big.Int, error)
 	GetNonce() (uint64, error)
-	Withdraw(token *Token, amount *big.Int, options *GasOptions) (*types.Transaction, error)
 	FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error)
 }
 
@@ -75,6 +75,18 @@ func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress 
 	}
 }
 
+func (p *DefaultEthProvider) Transfer(token *Token, amount *big.Int, recipient common.Address, options *GasOptions) (*types.Transaction, error) {
+	if token.IsETH() {
+		return nil, errors.New("this method for ERC20 tokens transfering only")
+	}
+	tokenContract, err := ERC20.NewERC20(token.GetAddress(), p.client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load token contract")
+	}
+	auth := p.getAuth(options)
+	return tokenContract.Transfer(auth, recipient, amount)
+}
+
 func (p *DefaultEthProvider) SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32, options *GasOptions) (*types.Transaction, error) {
 	auth := p.getAuth(options)
 	pkh, err := pkhToBytes(pubKeyHash)
@@ -84,6 +96,15 @@ func (p *DefaultEthProvider) SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32
 	return p.contract.SetAuthPubkeyHash(auth, pkh, zkNonce)
 }
 
+func (p *DefaultEthProvider) IsOnChainAuthPubkeyHashSet(nonce uint32) (bool, error) {
+	opts := &bind.CallOpts{}
+	publicKeyHash, err := p.contract.AuthFacts(opts, p.auth.From, nonce)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to call AuthFacts")
+	}
+	return publicKeyHash != [32]byte{}, nil
+}
+
 func (p *DefaultEthProvider) GetBalance() (*big.Int, error) {
 	return p.client.BalanceAt(context.Background(), p.auth.From, nil) // latest
 }
@@ -91,18 +112,9 @@ func (p *DefaultEthProvider) GetNonce() (uint64, error) {
 	return p.client.PendingNonceAt(context.Background(), p.auth.From) // pending
 }
 
-func (p *DefaultEthProvider) Withdraw(token *Token, amount *big.Int, options *GasOptions) (*types.Transaction, error) {
-	auth := p.getAuth(options)
-	if token.IsETH() {
-		return p.contract.WithdrawETH(auth, amount)
-	} else {
-		return p.contract.WithdrawERC20(auth, token.GetAddress(), amount)
-	}
-}
-
 func (p *DefaultEthProvider) FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error) {
 	auth := p.getAuth(options)
-	return p.contract.FullExit(auth, accountId, token.GetAddress())
+	return p.contract.RequestFullExit(auth, accountId, token.GetAddress())
 }
 
 // getAuth make a new copy of origin TransactOpts to be used safely for each call
