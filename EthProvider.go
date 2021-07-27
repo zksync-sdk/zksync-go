@@ -18,7 +18,7 @@ type EthProvider interface {
 	Deposit(token *Token, amount *big.Int, userAddress common.Address, options *GasOptions) (*types.Transaction, error)
 	SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32, options *GasOptions) (*types.Transaction, error)
 	IsOnChainAuthPubkeyHashSet(nonce uint32) (bool, error)
-	GetBalance() (*big.Int, error)
+	GetBalance(token *Token) (*big.Int, error)
 	GetNonce() (uint64, error)
 	FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error)
 }
@@ -75,18 +75,6 @@ func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress 
 	}
 }
 
-func (p *DefaultEthProvider) Transfer(token *Token, amount *big.Int, recipient common.Address, options *GasOptions) (*types.Transaction, error) {
-	if token.IsETH() {
-		return nil, errors.New("this method for ERC20 tokens transfering only")
-	}
-	tokenContract, err := ERC20.NewERC20(token.GetAddress(), p.client)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load token contract")
-	}
-	auth := p.getAuth(options)
-	return tokenContract.Transfer(auth, recipient, amount)
-}
-
 func (p *DefaultEthProvider) SetAuthPubkeyHash(pubKeyHash string, zkNonce uint32, options *GasOptions) (*types.Transaction, error) {
 	auth := p.getAuth(options)
 	pkh, err := pkhToBytes(pubKeyHash)
@@ -105,9 +93,18 @@ func (p *DefaultEthProvider) IsOnChainAuthPubkeyHashSet(nonce uint32) (bool, err
 	return publicKeyHash != [32]byte{}, nil
 }
 
-func (p *DefaultEthProvider) GetBalance() (*big.Int, error) {
-	return p.client.BalanceAt(context.Background(), p.auth.From, nil) // latest
+func (p *DefaultEthProvider) GetBalance(token *Token) (*big.Int, error) {
+	if token == nil || token.IsETH() {
+		return p.client.BalanceAt(context.Background(), p.auth.From, nil) // latest
+	}
+	tokenContract, err := ERC20.NewERC20(token.GetAddress(), p.client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load token contract")
+	}
+	opts := &bind.CallOpts{}
+	return tokenContract.BalanceOf(opts, p.auth.From)
 }
+
 func (p *DefaultEthProvider) GetNonce() (uint64, error) {
 	return p.client.PendingNonceAt(context.Background(), p.auth.From) // pending
 }

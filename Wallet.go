@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"github.com/zksync-sdk/zksync-go/contracts/ZkSync"
@@ -32,31 +33,11 @@ func NewWallet(ethSigner EthSigner, zkSigner *ZkSigner, provider Provider) (*Wal
 	}, nil
 }
 
-func (w *Wallet) loadAccountInfo() error {
-	state, err := w.provider.GetState(w.ethSigner.GetAddress())
-	if err != nil {
-		return errors.Wrap(err, "failed to get account state")
-	}
-	w.accountId = state.Id
-	w.pubKeyHash = state.Committed.PubKeyHash
-	return nil
-}
-
 func (w *Wallet) GetAccountId() (uint32, error) {
-	if w.accountId == 0 {
-		if err := w.loadAccountInfo(); err != nil {
-			return 0, err
-		}
-	}
 	return w.accountId, nil
 }
 
 func (w *Wallet) GetPubKeyHash() (string, error) {
-	if len(w.pubKeyHash) == 0 {
-		if err := w.loadAccountInfo(); err != nil {
-			return "", err
-		}
-	}
 	return w.pubKeyHash, nil
 }
 
@@ -89,15 +70,11 @@ func (w *Wallet) CreateEthereumProvider(client *ethclient.Client) (*DefaultEthPr
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to init ZkSync contract instance")
 	}
-	pk, err := w.ethSigner.GetPk()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get private key from ethSigner")
-	}
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get chain Id")
 	}
-	auth, err := bind.NewKeyedTransactorWithChainID(pk, chainId)
+	auth, err := w.newTransactorWithSigner(w.ethSigner, chainId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to init TransactOpts")
 	}
@@ -106,6 +83,27 @@ func (w *Wallet) CreateEthereumProvider(client *ethclient.Client) (*DefaultEthPr
 		contract: contract,
 		address:  contractAddress.GetMainAddress(),
 		auth:     auth,
+	}, nil
+}
+
+func (w *Wallet) newTransactorWithSigner(ethSigner EthSigner, chainID *big.Int) (*bind.TransactOpts, error) {
+	if chainID == nil {
+		return nil, bind.ErrNoChainID
+	}
+	keyAddr := ethSigner.GetAddress()
+	signer := types.LatestSignerForChainID(chainID)
+	return &bind.TransactOpts{
+		From: keyAddr,
+		Signer: func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+			if address != keyAddr {
+				return nil, bind.ErrNotAuthorized
+			}
+			signature, err := ethSigner.SignHash(signer.Hash(tx).Bytes())
+			if err != nil {
+				return nil, err
+			}
+			return tx.WithSignature(signer, signature)
+		},
 	}, nil
 }
 

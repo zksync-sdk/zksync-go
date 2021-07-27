@@ -1,7 +1,6 @@
 package zksync
 
 import (
-	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -13,8 +12,8 @@ import (
 
 type EthSigner interface {
 	GetAddress() common.Address
-	GetPk() (*ecdsa.PrivateKey, error)
 	SignMessage([]byte) ([]byte, error)
+	SignHash(msg []byte) ([]byte, error)
 	SignAuth(txData *ChangePubKey) (*ChangePubKeyECDSA, error)
 	SignTransaction(tx ZksTransaction, nonce uint32, token *Token, fee *big.Int) (*EthSignature, error)
 }
@@ -59,6 +58,14 @@ func (s *DefaultEthSigner) SignMessage(msg []byte) ([]byte, error) {
 	// set recovery byte to 27/28
 	if len(sig) == 65 {
 		sig[64] += 27
+	}
+	return sig, nil
+}
+
+func (s *DefaultEthSigner) SignHash(msg []byte) ([]byte, error) {
+	sig, err := s.wallet.SignHash(s.account, msg) // prefixed
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign message by wallet")
 	}
 	return sig, nil
 }
@@ -159,10 +166,6 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 		}
 	}
 	return nil, errors.New("unknown tx type")
-}
-
-func (s *DefaultEthSigner) GetPk() (*ecdsa.PrivateKey, error) {
-	return s.wallet.PrivateKey(s.account)
 }
 
 type EthSignatureType string

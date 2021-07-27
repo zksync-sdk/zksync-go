@@ -83,9 +83,9 @@ func (t *ChangePubKeyCREATE2) getType() ChangePubKeyAuthType {
 	return ChangePubKeyAuthTypeCREATE2
 }
 
-//func (t *ChangePubKeyCREATE2) getBytes() []byte {
-//	return make([]byte, 32)
-//}
+func (t *ChangePubKeyCREATE2) getBytes() []byte {
+	return make([]byte, 32)
+}
 
 type Signature struct {
 	PubKey    string `json:"pubKey"`

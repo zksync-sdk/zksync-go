@@ -16,7 +16,6 @@ func (d *TransactionFeeDetails) GetTotalFee() *big.Int {
 		return n
 	}
 	return new(big.Int)
-
 }
 
 func (d *TransactionFeeDetails) GetTxFee(feeToken *Token) *TransactionFee {
