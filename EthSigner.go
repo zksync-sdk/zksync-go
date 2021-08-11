@@ -8,6 +8,7 @@ import (
 	"github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/pkg/errors"
 	"math/big"
+	"strings"
 )
 
 type EthSigner interface {
@@ -16,6 +17,7 @@ type EthSigner interface {
 	SignHash(msg []byte) ([]byte, error)
 	SignAuth(txData *ChangePubKey) (*ChangePubKeyECDSA, error)
 	SignTransaction(tx ZksTransaction, nonce uint32, token *Token, fee *big.Int) (*EthSignature, error)
+	SignBatch(txs []ZksTransaction, nonce uint32, token *Token, fee *big.Int) (*EthSignature, error)
 }
 
 type DefaultEthSigner struct {
@@ -166,6 +168,61 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 		}
 	}
 	return nil, errors.New("unknown tx type")
+}
+
+func (s *DefaultEthSigner) SignBatch(txs []ZksTransaction, nonce uint32, token *Token, fee *big.Int) (*EthSignature, error) {
+	batchMsgs := make([]string, 0, len(txs))
+	for _, tx := range txs {
+
+		switch tx.getType() {
+		case "Transfer":
+			if txData, ok := tx.(*Transfer); ok {
+				var tokenToUse *Token
+				if txData.Token != nil {
+					tokenToUse = txData.Token
+				} else {
+					tokenToUse = token
+				}
+				fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+				if !ok {
+					return nil, errors.New("failed to convert string fee to big.Int")
+				}
+				msg, err := getTransferMessagePart(txData.To.String(), txData.Amount, fee, tokenToUse)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get Transfer message part")
+				}
+				batchMsgs = append(batchMsgs, msg)
+			}
+		case "Withdraw":
+			if txData, ok := tx.(*Withdraw); ok {
+				msg, err := getWithdrawMessagePart(txData.To.String(), txData.Amount, fee, token)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get Withdraw message part")
+				}
+				batchMsgs = append(batchMsgs, msg)
+			}
+		case "ForcedExit":
+			if txData, ok := tx.(*ForcedExit); ok {
+				msg, err := getForcedExitMessagePart(txData.Target.String(), fee, token)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get ForcedExit message part")
+				}
+				batchMsgs = append(batchMsgs, msg)
+			}
+		default:
+			return nil, errors.New("unknown tx type")
+		}
+	}
+	batchMsg := strings.Join(batchMsgs, "\n")
+	batchMsg += "\n" + getNonceMessagePart(nonce)
+	sig, err := s.SignMessage([]byte(batchMsg))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign batch of txs")
+	}
+	return &EthSignature{
+		Type:      EthSignatureTypeEth,
+		Signature: "0x" + hex.EncodeToString(sig),
+	}, nil
 }
 
 type EthSignatureType string

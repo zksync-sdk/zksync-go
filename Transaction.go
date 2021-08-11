@@ -17,12 +17,8 @@ type ZksTransaction interface {
 }
 
 type SignedTransaction struct {
-	transaction       ZksTransaction
-	ethereumSignature *EthSignature
-}
-
-func (tx *SignedTransaction) getTransaction() ZksTransaction {
-	return tx.transaction
+	Transaction       ZksTransaction `json:"tx"`
+	EthereumSignature *EthSignature  `json:"signature"`
 }
 
 type TransactionDetails struct {

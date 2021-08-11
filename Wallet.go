@@ -116,13 +116,13 @@ func (w *Wallet) SetSigningKey(fee *TransactionFee, nonce uint32, onchainAuth bo
 		if err != nil {
 			return "", errors.Wrap(err, "failed to build signed ChangePubKeyOnchain tx")
 		}
-		return w.submitSignedTransaction(signedTx.getTransaction(), nil, false)
+		return w.submitSignedTransaction(signedTx.Transaction, nil, false)
 	} else {
 		signedTx, err := w.buildSignedChangePubKeyTxSigned(fee, nonce, timeRange)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to build signed ChangePubKeySigned tx")
 		}
-		return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, false)
+		return w.submitSignedTransaction(signedTx.Transaction, nil, false)
 	}
 }
 
@@ -135,7 +135,7 @@ func (w *Wallet) SyncTransfer(to common.Address, amount *big.Int, fee *Transacti
 	if err != nil {
 		return "", errors.Wrap(err, "failed to build signed Transfer tx")
 	}
-	return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, false)
+	return w.submitSignedTransaction(signedTx.Transaction, signedTx.EthereumSignature, false)
 }
 
 func (w *Wallet) SyncWithdraw(ethAddress common.Address, amount *big.Int, fee *TransactionFee, nonce uint32, fastProcessing bool, timeRange *TimeRange) (string, error) {
@@ -143,7 +143,7 @@ func (w *Wallet) SyncWithdraw(ethAddress common.Address, amount *big.Int, fee *T
 	if err != nil {
 		return "", errors.Wrap(err, "failed to build signed Withdraw tx")
 	}
-	return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, fastProcessing)
+	return w.submitSignedTransaction(signedTx.Transaction, signedTx.EthereumSignature, fastProcessing)
 }
 
 func (w *Wallet) SyncForcedExit(target common.Address, fee *TransactionFee, nonce uint32, timeRange *TimeRange) (string, error) {
@@ -151,7 +151,7 @@ func (w *Wallet) SyncForcedExit(target common.Address, fee *TransactionFee, nonc
 	if err != nil {
 		return "", errors.Wrap(err, "failed to build signed Withdraw tx")
 	}
-	return w.submitSignedTransaction(signedTx.getTransaction(), signedTx.ethereumSignature, false)
+	return w.submitSignedTransaction(signedTx.Transaction, signedTx.EthereumSignature, false)
 }
 
 func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee *TransactionFee, nonce uint32, timeRange *TimeRange) (*SignedTransaction, error) {
@@ -176,7 +176,7 @@ func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee *TransactionFee, nonce uin
 	}
 	txData.Signature, err = w.zkSigner.SignChangePubKey(txData)
 	return &SignedTransaction{
-		transaction: txData,
+		Transaction: txData,
 	}, nil
 }
 
@@ -204,14 +204,9 @@ func (w *Wallet) buildSignedChangePubKeyTxSigned(fee *TransactionFee, nonce uint
 		return nil, errors.Wrap(err, "failed to get sign auth data")
 	}
 	txData.EthAuthData = auth
-	ethSig, err := w.ethSigner.SignTransaction(txData, nonce, token, fee.Fee)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sign of transaction")
-	}
 	txData.Signature, err = w.zkSigner.SignChangePubKey(txData)
 	return &SignedTransaction{
-		transaction:       txData,
-		ethereumSignature: ethSig,
+		Transaction: txData,
 	}, nil
 }
 
@@ -242,8 +237,8 @@ func (w *Wallet) buildSignedTransferTx(to common.Address, amount *big.Int, fee *
 	}
 	txData.Signature, err = w.zkSigner.SignTransfer(txData)
 	return &SignedTransaction{
-		transaction:       txData,
-		ethereumSignature: ethSig,
+		Transaction:       txData,
+		EthereumSignature: ethSig,
 	}, nil
 }
 
@@ -273,8 +268,8 @@ func (w *Wallet) buildSignedWithdrawTx(to common.Address, tokenId string, amount
 	}
 	txData.Signature, err = w.zkSigner.SignWithdraw(txData)
 	return &SignedTransaction{
-		transaction:       txData,
-		ethereumSignature: ethSig,
+		Transaction:       txData,
+		EthereumSignature: ethSig,
 	}, nil
 }
 
@@ -302,11 +297,15 @@ func (w *Wallet) buildSignedForcedExit(target common.Address, tokenId string, fe
 	}
 	txData.Signature, err = w.zkSigner.SignForcedExit(txData)
 	return &SignedTransaction{
-		transaction:       txData,
-		ethereumSignature: ethSig,
+		Transaction:       txData,
+		EthereumSignature: ethSig,
 	}, nil
 }
 
 func (w *Wallet) submitSignedTransaction(tx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error) {
 	return w.provider.SubmitTx(tx, ethSignature, fastProcessing)
+}
+
+func (w *Wallet) submitSignedTransactionsBatch(txs []*SignedTransaction, ethSignature *EthSignature) ([]string, error) {
+	return w.provider.SubmitTxsBatch(txs, ethSignature)
 }

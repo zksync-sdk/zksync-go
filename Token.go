@@ -32,10 +32,9 @@ func (t Token) GetAddress() common.Address {
 }
 
 func (t Token) ToBigFloat(amount *big.Int) *big.Float {
-	af := big.NewFloat(0).SetInt(amount)
-	div := big.NewFloat(0).SetInt(big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil))
-	res := big.NewFloat(0).SetPrec(t.Decimals*8).Quo(af, div)
-	return res
+	amountFloat := big.NewFloat(0).SetInt(amount)
+	divider := big.NewFloat(0).SetInt(big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil)) // 10^decimals
+	return big.NewFloat(0).SetPrec(t.Decimals*8).Quo(amountFloat, divider)                                   // amount / 10^decimals
 }
 
 type Tokens struct {

@@ -14,7 +14,9 @@ type Provider interface {
 	ContractAddress() (*ContractAddress, error)
 	GetState(address common.Address) (*AccountState, error)
 	GetTransactionFee(txType TransactionType, address common.Address, token *Token) (*TransactionFeeDetails, error)
+	GetTransactionsBatchFee(txTypes []TransactionType, addresses []common.Address, token *Token) (*TransactionFeeDetails, error)
 	SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error)
+	SubmitTxsBatch(signedTxs []*SignedTransaction, ethSignature *EthSignature) ([]string, error)
 	GetTransactionDetails(txHash string) (*TransactionDetails, error)
 	GetConfirmationsForEthOpAmount() (*big.Int, error)
 	GetEthOpInfo(priority uint64) (*EthOpInfo, error)
@@ -111,6 +113,28 @@ func (p *DefaultProvider) GetTransactionFee(txType TransactionType, address comm
 	return res, nil
 }
 
+func (p *DefaultProvider) GetTransactionsBatchFee(txTypes []TransactionType, addresses []common.Address, token *Token) (*TransactionFeeDetails, error) {
+	res := new(TransactionFeeDetails)
+	if len(txTypes) != len(addresses) {
+		return nil, errors.New("count of Transaction Types and addresses is mismatch")
+	}
+	txTypesList := make([]string, len(txTypes))
+	addressesList := make([]string, len(addresses))
+	for i, t := range txTypes {
+		if txType, ok := t.getType().(string); ok {
+			txTypesList[i] = txType
+		} else {
+			return nil, errors.New("invalid transaction Type for batch fee request")
+		}
+		addressesList[i] = addresses[i].String()
+	}
+	err := p.client.Call(&res, "get_txs_batch_fee_in_wei", txTypesList, addressesList, token.Symbol)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to call `get_txs_batch_fee_in_wei` method")
+	}
+	return res, nil
+}
+
 func (p *DefaultProvider) GetTransactionDetails(txHash string) (*TransactionDetails, error) {
 	res := new(TransactionDetails)
 	err := p.client.Call(&res, "tx_info", txHash)
@@ -125,6 +149,19 @@ func (p *DefaultProvider) SubmitTx(signedTx ZksTransaction, ethSignature *EthSig
 	err := p.client.Call(&res, "tx_submit", signedTx, ethSignature, fastProcessing)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to call `tx_submit` method")
+	}
+	return res, nil
+}
+
+func (p *DefaultProvider) SubmitTxsBatch(signedTxs []*SignedTransaction, ethSignature *EthSignature) ([]string, error) {
+	res := make([]string, len(signedTxs))
+	signatures := make([]*EthSignature, 0)
+	if ethSignature != nil {
+		signatures = append(signatures, ethSignature)
+	}
+	err := p.client.Call(&res, "submit_txs_batch", signedTxs, signatures)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to call `submit_txs_batch` method")
 	}
 	return res, nil
 }
