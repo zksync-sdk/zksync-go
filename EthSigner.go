@@ -143,7 +143,7 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 			msg += "\n" + getNonceMessagePart(nonce)
 			sig, err := s.SignMessage([]byte(msg))
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to sign Transfer tx")
+				return nil, errors.Wrap(err, "failed to sign Withdraw tx")
 			}
 			return &EthSignature{
 				Type:      EthSignatureTypeEth,
@@ -159,7 +159,39 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 			msg += "\n" + getNonceMessagePart(nonce)
 			sig, err := s.SignMessage([]byte(msg))
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to sign Transfer tx")
+				return nil, errors.Wrap(err, "failed to sign ForcedExit tx")
+			}
+			return &EthSignature{
+				Type:      EthSignatureTypeEth,
+				Signature: "0x" + hex.EncodeToString(sig),
+			}, nil
+		}
+	case "MintNFT":
+		if txData, ok := tx.(*MintNFT); ok {
+			msg, err := getMintNFTMessagePart(txData.ContentHash, txData.Recipient.String(), fee, token)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get MintNFT message part")
+			}
+			msg += "\n" + getNonceMessagePart(nonce)
+			sig, err := s.SignMessage([]byte(msg))
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to sign MintNFT tx")
+			}
+			return &EthSignature{
+				Type:      EthSignatureTypeEth,
+				Signature: "0x" + hex.EncodeToString(sig),
+			}, nil
+		}
+	case "WithdrawNFT":
+		if txData, ok := tx.(*WithdrawNFT); ok {
+			msg, err := getWithdrawNFTMessagePart(txData.To.String(), txData.Token, fee, token)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get WithdrawNFT message part")
+			}
+			msg += "\n" + getNonceMessagePart(nonce)
+			sig, err := s.SignMessage([]byte(msg))
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to sign WithdrawNFT tx")
 			}
 			return &EthSignature{
 				Type:      EthSignatureTypeEth,
@@ -206,6 +238,22 @@ func (s *DefaultEthSigner) SignBatch(txs []ZksTransaction, nonce uint32, token *
 				msg, err := getForcedExitMessagePart(txData.Target.String(), fee, token)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to get ForcedExit message part")
+				}
+				batchMsgs = append(batchMsgs, msg)
+			}
+		case "MintNFT":
+			if txData, ok := tx.(*MintNFT); ok {
+				msg, err := getMintNFTMessagePart(txData.ContentHash, txData.Recipient.String(), fee, token)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get MintNFT message part")
+				}
+				batchMsgs = append(batchMsgs, msg)
+			}
+		case "WithdrawNFT":
+			if txData, ok := tx.(*WithdrawNFT); ok {
+				msg, err := getWithdrawNFTMessagePart(txData.To.String(), txData.Token, fee, token)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get WithdrawNFT message part")
 				}
 				batchMsgs = append(batchMsgs, msg)
 			}

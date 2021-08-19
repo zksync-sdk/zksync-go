@@ -23,9 +23,8 @@ type State struct {
 	Balances   map[string]string `json:"balances"`
 	Nonce      uint32            `json:"nonce"`
 	PubKeyHash string            `json:"pubKeyHash"`
-	// TODO NFTs
-	//Nfts       map[string]*NFT `json:"nfts"`
-	//MintedNfts map[string]*NFT `json:"mintedNfts"`
+	Nfts       map[string]*NFT   `json:"nfts"`
+	MintedNfts map[string]*NFT   `json:"mintedNfts"`
 }
 
 func (s *State) GetBalanceOf(token string) (*big.Int, bool) {

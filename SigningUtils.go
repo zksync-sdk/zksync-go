@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"math/big"
 	"strings"
@@ -152,13 +153,13 @@ func getChangePubKeyData(txData *ChangePubKey) ([]byte, error) {
 func getTransferMessagePart(to string, amount, fee *big.Int, token *Token) (string, error) {
 	var res string
 	if big.NewInt(0).Cmp(amount) != 0 {
-		res = fmt.Sprintf("Transfer %s %s to: %s", token.ToBigFloat(amount).Text('f', -int(token.Decimals)), token.Symbol, strings.ToLower(to))
+		res = fmt.Sprintf("Transfer %s %s to: %s", token.ToDecimalString(amount), token.Symbol, strings.ToLower(to))
 	}
 	if fee.Cmp(big.NewInt(0)) > 0 {
 		if len(res) > 0 {
 			res += "\n"
 		}
-		res += fmt.Sprintf("Fee: %s %s", token.ToBigFloat(fee).Text('f', -int(token.Decimals)), token.Symbol)
+		res += fmt.Sprintf("Fee: %s %s", token.ToDecimalString(fee), token.Symbol)
 	}
 	return res, nil
 }
@@ -166,13 +167,13 @@ func getTransferMessagePart(to string, amount, fee *big.Int, token *Token) (stri
 func getWithdrawMessagePart(to string, amount, fee *big.Int, token *Token) (string, error) {
 	var res string
 	if big.NewInt(0).Cmp(amount) != 0 {
-		res = fmt.Sprintf("Withdraw %s %s to: %s", token.ToBigFloat(amount).Text('f', -int(token.Decimals)), token.Symbol, strings.ToLower(to))
+		res = fmt.Sprintf("Withdraw %s %s to: %s", token.ToDecimalString(amount), token.Symbol, strings.ToLower(to))
 	}
 	if fee.Cmp(big.NewInt(0)) > 0 {
 		if len(res) > 0 {
 			res += "\n"
 		}
-		res += fmt.Sprintf("Fee: %s %s", token.ToBigFloat(fee).Text('f', -int(token.Decimals)), token.Symbol)
+		res += fmt.Sprintf("Fee: %s %s", token.ToDecimalString(fee), token.Symbol)
 	}
 	return res, nil
 }
@@ -181,7 +182,25 @@ func getForcedExitMessagePart(to string, fee *big.Int, token *Token) (string, er
 	var res string
 	res = fmt.Sprintf("ForcedExit %s to: %s", token.Symbol, strings.ToLower(to))
 	if fee.Cmp(big.NewInt(0)) > 0 {
-		res += fmt.Sprintf("\nFee: %s %s", token.ToBigFloat(fee).Text('f', -int(token.Decimals)), token.Symbol)
+		res += fmt.Sprintf("\nFee: %s %s", token.ToDecimalString(fee), token.Symbol)
+	}
+	return res, nil
+}
+
+func getMintNFTMessagePart(contentHash common.Hash, to string, fee *big.Int, token *Token) (string, error) {
+	var res string
+	res = fmt.Sprintf("MintNFT %s for: %s", contentHash.String(), strings.ToLower(to))
+	if fee.Cmp(big.NewInt(0)) > 0 {
+		res += fmt.Sprintf("\nFee: %s %s", token.ToDecimalString(fee), token.Symbol)
+	}
+	return res, nil
+}
+
+func getWithdrawNFTMessagePart(to string, tokenId uint32, fee *big.Int, token *Token) (string, error) {
+	var res string
+	res = fmt.Sprintf("WithdrawNFT %d to: %s", tokenId, strings.ToLower(to))
+	if fee.Cmp(big.NewInt(0)) > 0 {
+		res += fmt.Sprintf("\nFee: %s %s", token.ToDecimalString(fee), token.Symbol)
 	}
 	return res, nil
 }

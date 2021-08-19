@@ -206,6 +206,68 @@ func (s *ZkSigner) SignForcedExit(txData *ForcedExit) (*Signature, error) {
 	return res, nil
 }
 
+func (s *ZkSigner) SignMintNFT(txData *MintNFT) (*Signature, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0xff - 0x09)
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(txData.CreatorId))
+	buf.Write(txData.CreatorAddress[:])
+	buf.Write(txData.ContentHash.Bytes())
+	buf.Write(txData.Recipient[:])
+	buf.Write(Uint32ToBytes(txData.FeeToken))
+	fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+	if !ok {
+		return nil, errors.New("failed to convert string fee to big.Int")
+	}
+	packedFee, err := packFee(fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack fee")
+	}
+	buf.Write(packedFee)
+	buf.Write(Uint32ToBytes(txData.Nonce))
+	sig, err := s.Sign(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign MintNFT tx data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
+}
+
+func (s *ZkSigner) SignWithdrawNFT(txData *WithdrawNFT) (*Signature, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0xff - 0x0a)
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(txData.AccountId))
+	buf.Write(txData.From[:])
+	buf.Write(txData.To[:])
+	buf.Write(Uint32ToBytes(txData.Token))
+	buf.Write(Uint32ToBytes(txData.FeeToken))
+	fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+	if !ok {
+		return nil, errors.New("failed to convert string fee to big.Int")
+	}
+	packedFee, err := packFee(fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack fee")
+	}
+	buf.Write(packedFee)
+	buf.Write(Uint32ToBytes(txData.Nonce))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidFrom))
+	buf.Write(Uint64ToBytes(txData.TimeRange.ValidUntil))
+	sig, err := s.Sign(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign WithdrawNFT tx data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
+}
+
 func (s *ZkSigner) GetPublicKeyHash() string {
 	return "sync:" + s.publicKeyHash.HexString()
 }

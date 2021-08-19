@@ -21,6 +21,7 @@ type EthProvider interface {
 	GetBalance(token *Token) (*big.Int, error)
 	GetNonce() (uint64, error)
 	FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error)
+	FullExitNFT(token *NFT, accountId uint32, options *GasOptions) (*types.Transaction, error)
 }
 
 type DefaultEthProvider struct {
@@ -112,6 +113,11 @@ func (p *DefaultEthProvider) GetNonce() (uint64, error) {
 func (p *DefaultEthProvider) FullExit(token *Token, accountId uint32, options *GasOptions) (*types.Transaction, error) {
 	auth := p.getAuth(options)
 	return p.contract.RequestFullExit(auth, accountId, token.GetAddress())
+}
+
+func (p *DefaultEthProvider) FullExitNFT(token *NFT, accountId uint32, options *GasOptions) (*types.Transaction, error) {
+	auth := p.getAuth(options)
+	return p.contract.RequestFullExitNFT(auth, accountId, token.Id)
 }
 
 // getAuth make a new copy of origin TransactOpts to be used safely for each call
