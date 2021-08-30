@@ -18,6 +18,7 @@ type EthSigner interface {
 	SignAuth(txData *ChangePubKey) (*ChangePubKeyECDSA, error)
 	SignTransaction(tx ZksTransaction, nonce uint32, token *Token, fee *big.Int) (*EthSignature, error)
 	SignBatch(txs []ZksTransaction, nonce uint32, token *Token, fee *big.Int) (*EthSignature, error)
+	SignOrder(order *Order, sell, buy *Token) (*EthSignature, error)
 }
 
 type DefaultEthSigner struct {
@@ -198,6 +199,17 @@ func (s *DefaultEthSigner) SignTransaction(tx ZksTransaction, nonce uint32, toke
 				Signature: "0x" + hex.EncodeToString(sig),
 			}, nil
 		}
+	case "Swap":
+		msg := getSwapMessagePart(token, fee)
+		msg += "\n" + getNonceMessagePart(nonce)
+		sig, err := s.SignMessage([]byte(msg))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to sign Swap tx")
+		}
+		return &EthSignature{
+			Type:      EthSignatureTypeEth,
+			Signature: "0x" + hex.EncodeToString(sig),
+		}, nil
 	}
 	return nil, errors.New("unknown tx type")
 }
@@ -266,6 +278,22 @@ func (s *DefaultEthSigner) SignBatch(txs []ZksTransaction, nonce uint32, token *
 	sig, err := s.SignMessage([]byte(batchMsg))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to sign batch of txs")
+	}
+	return &EthSignature{
+		Type:      EthSignatureTypeEth,
+		Signature: "0x" + hex.EncodeToString(sig),
+	}, nil
+}
+
+func (s *DefaultEthSigner) SignOrder(order *Order, sell, buy *Token) (*EthSignature, error) {
+	msg, err := getOrderMessagePart(order.RecipientAddress.String(), order.Amount, sell, buy, order.Ratio)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get Order message part")
+	}
+	msg += "\n" + getNonceMessagePart(order.Nonce)
+	sig, err := s.SignMessage([]byte(msg))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign Order")
 	}
 	return &EthSignature{
 		Type:      EthSignatureTypeEth,

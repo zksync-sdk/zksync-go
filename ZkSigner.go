@@ -268,6 +268,99 @@ func (s *ZkSigner) SignWithdrawNFT(txData *WithdrawNFT) (*Signature, error) {
 	return res, nil
 }
 
+func (s *ZkSigner) SignOrder(order *Order) (*Signature, error) {
+	message, err := s.getOrderBytes(order)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get order bytes")
+	}
+	sig, err := s.Sign(message)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign Order data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
+}
+func (s *ZkSigner) getOrderBytes(order *Order) ([]byte, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0x6f) // ASCII 'o' in hex for (o)rder
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(order.AccountId))
+	buf.Write(order.RecipientAddress[:])
+	buf.Write(Uint32ToBytes(order.Nonce))
+	buf.Write(Uint32ToBytes(order.TokenSell))
+	buf.Write(Uint32ToBytes(order.TokenBuy))
+	if len(order.Ratio) != 2 {
+		return nil, errors.New("invalid ratio")
+	}
+	buf.Write(BigIntToBytesBE(order.Ratio[0], 15))
+	buf.Write(BigIntToBytesBE(order.Ratio[1], 15))
+	packedAmount, err := packAmount(order.Amount)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack amount")
+	}
+	buf.Write(packedAmount)
+	buf.Write(Uint64ToBytes(order.TimeRange.ValidFrom))
+	buf.Write(Uint64ToBytes(order.TimeRange.ValidUntil))
+	return buf.Bytes(), nil
+}
+
+func (s *ZkSigner) SignSwap(txData *Swap) (*Signature, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte(0xff - 0x0b)
+	buf.WriteByte(TransactionVersion)
+	buf.Write(Uint32ToBytes(txData.SubmitterId))
+	buf.Write(txData.SubmitterAddress[:])
+	buf.Write(Uint32ToBytes(txData.Nonce))
+	if len(txData.Orders) != 2 {
+		return nil, errors.New("invalid orders in Swap tx")
+	}
+	order1, err := s.getOrderBytes(txData.Orders[0])
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get order1 bytes")
+	}
+	order2, err := s.getOrderBytes(txData.Orders[1])
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get order2 bytes")
+	}
+	buf.Write(zkscrypto.ResqueHashOrders(append(order1, order2...)).GetBytes())
+	buf.Write(Uint32ToBytes(txData.FeeToken))
+	fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+	if !ok {
+		return nil, errors.New("failed to convert string fee to big.Int")
+	}
+	packedFee, err := packFee(fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack fee")
+	}
+	buf.Write(packedFee)
+	if len(txData.Amounts) != 2 {
+		return nil, errors.New("invalid amounts in Swap tx")
+	}
+	packedAmount, err := packAmount(txData.Amounts[0])
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack amount1")
+	}
+	buf.Write(packedAmount)
+	packedAmount, err = packAmount(txData.Amounts[1])
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pack amount2")
+	}
+	buf.Write(packedAmount)
+
+	sig, err := s.Sign(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign Swap tx data")
+	}
+	res := &Signature{
+		PubKey:    s.GetPublicKey(),
+		Signature: sig.HexString(),
+	}
+	return res, nil
+}
+
 func (s *ZkSigner) GetPublicKeyHash() string {
 	return "sync:" + s.publicKeyHash.HexString()
 }

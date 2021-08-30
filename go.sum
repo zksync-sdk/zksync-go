@@ -635,6 +635,10 @@ github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210423071041-006032f36311 h1:9X4Jqk
 github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210423071041-006032f36311/go.mod h1:ZUgHa5wGdUAYfBlO6iEL3UV/IVTiKNI4JuWlLnbBpWM=
 github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210709185316-cbee6c034278 h1:l89tCsnD8sTWUoCzV39/VdO0vkeWbmOH4EAWQTf2Le0=
 github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210709185316-cbee6c034278/go.mod h1:ZUgHa5wGdUAYfBlO6iEL3UV/IVTiKNI4JuWlLnbBpWM=
+github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210829221342-acd48b3540e8 h1:2L64oKbaq1nbyKdQS82DDvftj8WhER9HfAtl3KwiQyc=
+github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210829221342-acd48b3540e8/go.mod h1:ZUgHa5wGdUAYfBlO6iEL3UV/IVTiKNI4JuWlLnbBpWM=
+github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210830110931-e2635cfaf5af h1:vTfrfLg+X2/mHqNgWk5rTTzWpv0T7s3PD2aWibZBUXw=
+github.com/zksync-sdk/zksync-sdk-go v0.0.0-20210830110931-e2635cfaf5af/go.mod h1:ZUgHa5wGdUAYfBlO6iEL3UV/IVTiKNI4JuWlLnbBpWM=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=

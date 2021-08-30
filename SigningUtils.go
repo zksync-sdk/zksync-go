@@ -30,6 +30,12 @@ func Uint64ToBytes(v uint64) []byte {
 	return res
 }
 
+func BigIntToBytesBE(v *big.Int, numBytes int) []byte {
+	val := v.Bytes()
+	res := make([]byte, numBytes-len(val)) // left padded with 0 bytes to target length
+	return append(res, val...)
+}
+
 func pkhToBytes(pkh string) ([]byte, error) {
 	if pkh[:5] != "sync:" {
 		return nil, errors.New("PubKeyHash must start with 'sync:'")
@@ -203,6 +209,24 @@ func getWithdrawNFTMessagePart(to string, tokenId uint32, fee *big.Int, token *T
 		res += fmt.Sprintf("\nFee: %s %s", token.ToDecimalString(fee), token.Symbol)
 	}
 	return res, nil
+}
+
+func getOrderMessagePart(recipient string, amount *big.Int, sell, buy *Token, ratio []*big.Int) (string, error) {
+	if len(ratio) != 2 {
+		return "", errors.New("invalid ratio")
+	}
+	var res string
+	if amount.Cmp(big.NewInt(0)) == 0 {
+		res = fmt.Sprintf("Limit order for %s -> %s", sell.Symbol, buy.Symbol)
+	} else {
+		res = fmt.Sprintf("Order for %s %s -> %s", sell.ToDecimalString(amount), sell.Symbol, buy.Symbol)
+	}
+	res += fmt.Sprintf("\nRatio: %s:%s\nAddress: %s", ratio[0].String(), ratio[1].String(), strings.ToLower(recipient))
+	return res, nil
+}
+
+func getSwapMessagePart(token *Token, fee *big.Int) string {
+	return fmt.Sprintf("Swap fee: %s %s", token.ToDecimalString(fee), token.Symbol)
 }
 
 func getNonceMessagePart(nonce uint32) string {

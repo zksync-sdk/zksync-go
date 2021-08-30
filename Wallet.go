@@ -193,6 +193,9 @@ func (w *Wallet) SyncTransferNFT(to common.Address, NFToken *NFT, fee *Transacti
 		TimeRange: timeRange,
 	}
 	transferTx.Signature, err = w.zkSigner.SignTransfer(transferTx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of Transfer")
+	}
 	// 2 transfer fee
 	feeTx := &Transfer{
 		Type:      "Transfer",
@@ -207,12 +210,56 @@ func (w *Wallet) SyncTransferNFT(to common.Address, NFToken *NFT, fee *Transacti
 		TimeRange: timeRange,
 	}
 	feeTx.Signature, err = w.zkSigner.SignTransfer(feeTx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of Transfer")
+	}
 	// common eth signature
 	ethSig, err := w.ethSigner.SignBatch([]ZksTransaction{transferTx, feeTx}, nonce, feeToken, fee.Fee)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get sign of transactions batch")
 	}
 	return w.submitSignedTransactionsBatch([]*SignedTransaction{{Transaction: transferTx}, {Transaction: feeTx}}, ethSig)
+}
+
+func (w *Wallet) SyncSwap(order1, order2 *Order, amount1, amount2 *big.Int, fee *TransactionFee, nonce uint32) (string, error) {
+	signedTx, err := w.buildSignedSwapTx(order1, order2, amount1, amount2, fee, nonce)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to build signed Swap tx")
+	}
+	return w.submitMultiSignedTransaction(signedTx.Transaction,
+		signedTx.EthereumSignature, order1.EthereumSignature, order2.EthereumSignature)
+}
+
+func (w *Wallet) BuildSignedOrder(recipient common.Address, sell, buy *Token, ratio []*big.Int, amount *big.Int,
+	nonce uint32, timeRange *TimeRange) (*Order, error) {
+	if len(ratio) != 2 {
+		return nil, errors.New("invalid ratio")
+	}
+	order := &Order{
+		AccountId:        w.accountId,
+		Amount:           amount,
+		RecipientAddress: recipient,
+		TokenSell:        sell.Id,
+		TokenBuy:         buy.Id,
+		Ratio:            ratio,
+		Nonce:            nonce,
+		TimeRange:        timeRange,
+	}
+	var err error
+	order.EthereumSignature, err = w.ethSigner.SignOrder(order, sell, buy)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get eth sign of Order")
+	}
+	order.Signature, err = w.zkSigner.SignOrder(order)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of Order")
+	}
+	return order, nil
+}
+
+func (w *Wallet) BuildSignedLimitOrder(recipient common.Address, sell, buy *Token, ratio []*big.Int,
+	nonce uint32, timeRange *TimeRange) (*Order, error) {
+	return w.BuildSignedOrder(recipient, sell, buy, ratio, big.NewInt(0), nonce, timeRange)
 }
 
 func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee *TransactionFee, nonce uint32, timeRange *TimeRange) (*SignedTransaction, error) {
@@ -236,6 +283,9 @@ func (w *Wallet) buildSignedChangePubKeyTxOnchain(fee *TransactionFee, nonce uin
 		TimeRange:   timeRange,
 	}
 	txData.Signature, err = w.zkSigner.SignChangePubKey(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of ChangePubKey")
+	}
 	return &SignedTransaction{
 		Transaction: txData,
 	}, nil
@@ -262,10 +312,13 @@ func (w *Wallet) buildSignedChangePubKeyTxSigned(fee *TransactionFee, nonce uint
 	}
 	auth, err := w.ethSigner.SignAuth(txData)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get sign auth data")
+		return nil, errors.Wrap(err, "failed to get eth sign of auth data")
 	}
 	txData.EthAuthData = auth
 	txData.Signature, err = w.zkSigner.SignChangePubKey(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of ChangePubKey")
+	}
 	return &SignedTransaction{
 		Transaction: txData,
 	}, nil
@@ -297,6 +350,9 @@ func (w *Wallet) buildSignedTransferTx(to common.Address, amount *big.Int, fee *
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignTransfer(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of Transfer")
+	}
 	return &SignedTransaction{
 		Transaction:       txData,
 		EthereumSignature: ethSig,
@@ -328,6 +384,9 @@ func (w *Wallet) buildSignedWithdrawTx(to common.Address, tokenId string, amount
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignWithdraw(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of Withdraw")
+	}
 	return &SignedTransaction{
 		Transaction:       txData,
 		EthereumSignature: ethSig,
@@ -357,6 +416,9 @@ func (w *Wallet) buildSignedForcedExitTx(target common.Address, tokenId string, 
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignForcedExit(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of ForcedExit")
+	}
 	return &SignedTransaction{
 		Transaction:       txData,
 		EthereumSignature: ethSig,
@@ -387,6 +449,9 @@ func (w *Wallet) buildSignedMintNFTTx(to common.Address, contentHash common.Hash
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignMintNFT(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of MintNFT")
+	}
 	return &SignedTransaction{
 		Transaction:       txData,
 		EthereumSignature: ethSig,
@@ -418,6 +483,42 @@ func (w *Wallet) buildSignedWithdrawNFTTx(to common.Address, NFToken *NFT, feeTo
 		return nil, errors.Wrap(err, "failed to get sign of transaction")
 	}
 	txData.Signature, err = w.zkSigner.SignWithdrawNFT(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of WithdrawNFT")
+	}
+	return &SignedTransaction{
+		Transaction:       txData,
+		EthereumSignature: ethSig,
+	}, nil
+}
+
+func (w *Wallet) buildSignedSwapTx(order1, order2 *Order, amount1, amount2 *big.Int, fee *TransactionFee, nonce uint32) (*SignedTransaction, error) {
+	tokens, err := w.provider.GetTokens()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get tokens")
+	}
+	token, err := tokens.GetToken(fee.FeeToken)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get fee token")
+	}
+	txData := &Swap{
+		Type:             "Swap",
+		Orders:           []*Order{order1, order2},
+		SubmitterId:      w.accountId,
+		SubmitterAddress: w.ethSigner.GetAddress(),
+		Amounts:          []*big.Int{amount1, amount2},
+		Nonce:            nonce,
+		Fee:              fee.Fee.String(),
+		FeeToken:         token.Id,
+	}
+	ethSig, err := w.ethSigner.SignTransaction(txData, nonce, token, fee.Fee)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get eth sign of swap transaction")
+	}
+	txData.Signature, err = w.zkSigner.SignSwap(txData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get sign of Swap tx")
+	}
 	return &SignedTransaction{
 		Transaction:       txData,
 		EthereumSignature: ethSig,
@@ -426,6 +527,10 @@ func (w *Wallet) buildSignedWithdrawNFTTx(to common.Address, NFToken *NFT, feeTo
 
 func (w *Wallet) submitSignedTransaction(tx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error) {
 	return w.provider.SubmitTx(tx, ethSignature, fastProcessing)
+}
+
+func (w *Wallet) submitMultiSignedTransaction(tx ZksTransaction, ethSignatures ...*EthSignature) (string, error) {
+	return w.provider.SubmitTxMultiSig(tx, ethSignatures...)
 }
 
 func (w *Wallet) submitSignedTransactionsBatch(txs []*SignedTransaction, ethSignature *EthSignature) ([]string, error) {

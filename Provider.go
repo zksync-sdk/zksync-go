@@ -16,6 +16,7 @@ type Provider interface {
 	GetTransactionFee(txType TransactionType, address common.Address, token *Token) (*TransactionFeeDetails, error)
 	GetTransactionsBatchFee(txTypes []TransactionType, addresses []common.Address, token *Token) (*TransactionFeeDetails, error)
 	SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error)
+	SubmitTxMultiSig(signedTx ZksTransaction, ethSignatures ...*EthSignature) (string, error)
 	SubmitTxsBatch(signedTxs []*SignedTransaction, ethSignature *EthSignature) ([]string, error)
 	GetTransactionDetails(txHash string) (*TransactionDetails, error)
 	GetConfirmationsForEthOpAmount() (*big.Int, error)
@@ -147,6 +148,15 @@ func (p *DefaultProvider) GetTransactionDetails(txHash string) (*TransactionDeta
 func (p *DefaultProvider) SubmitTx(signedTx ZksTransaction, ethSignature *EthSignature, fastProcessing bool) (string, error) {
 	var res string
 	err := p.client.Call(&res, "tx_submit", signedTx, ethSignature, fastProcessing)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to call `tx_submit` method")
+	}
+	return res, nil
+}
+
+func (p *DefaultProvider) SubmitTxMultiSig(signedTx ZksTransaction, ethSignatures ...*EthSignature) (string, error) {
+	var res string
+	err := p.client.Call(&res, "tx_submit", signedTx, ethSignatures)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to call `tx_submit` method")
 	}
