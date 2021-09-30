@@ -12,6 +12,8 @@ import (
 	"math/big"
 )
 
+//go:generate mockery -name=EthProvider -output=./ -outpkg=zksync -filename=EthProviderMock_test.go -structname=EthProviderMock -inpkg
+
 type EthProvider interface {
 	ApproveDeposits(token *Token, limit *big.Int, options *GasOptions) (*types.Transaction, error)
 	IsDepositApproved(token *Token, userAddress common.Address, threshold *big.Int) (bool, error)

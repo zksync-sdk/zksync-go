@@ -7,6 +7,8 @@ import (
 	"math/big"
 )
 
+//go:generate mockery -name=Provider -output=./ -outpkg=zksync -filename=ProviderMock_test.go -structname=ProviderMock -inpkg
+
 type Provider interface {
 	GetTokens() (*Tokens, error)
 	UpdateTokenSet() error
