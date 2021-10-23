@@ -37,8 +37,8 @@ func (w *Wallet) GetAccountId() (uint32, error) {
 	return w.accountId, nil
 }
 
-func (w *Wallet) GetPubKeyHash() (string, error) {
-	return w.pubKeyHash, nil
+func (w *Wallet) GetPubKeyHash() string {
+	return w.pubKeyHash
 }
 
 func (w *Wallet) GetAddress() common.Address {
@@ -54,6 +54,8 @@ func (w *Wallet) GetState() (*AccountState, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get account state")
 	}
+	w.accountId = state.Id
+	w.pubKeyHash = state.Committed.PubKeyHash
 	return state, nil
 }
 
