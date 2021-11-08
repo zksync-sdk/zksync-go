@@ -40,7 +40,10 @@ func (t Token) ToDecimalString(amount *big.Int) string {
 	// convert to pointed value considering decimals scale, like wei => ETH (10^18 wei == 1 ETH)
 	divider := big.NewFloat(0).SetInt(big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil)) // = 10^decimals
 	res := big.NewFloat(0).SetPrec(t.Decimals*8).Quo(amountFloat, divider)                                   // = amount / 10^decimals
-	return res.Text('f', -int(t.Decimals))                                                                   // format as numeric with specified decimals limit
+	if res.IsInt() {
+		return res.Text('f', 1) // return int value in "XXX.0" format
+	}
+	return res.Text('f', -int(t.Decimals)) // format as numeric with specified decimals limit
 }
 
 type Tokens struct {

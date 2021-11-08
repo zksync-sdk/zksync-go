@@ -70,10 +70,11 @@ func (p *DefaultEthProvider) IsDepositApproved(token *Token, userAddress common.
 
 func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress common.Address, options *GasOptions) (*types.Transaction, error) {
 	auth := p.getAuth(options)
-	auth.Value = amount
 	if token.IsETH() {
+		auth.Value = amount
 		return p.contract.DepositETH(auth, userAddress)
 	} else {
+		auth.Value = nil
 		return p.contract.DepositERC20(auth, token.GetAddress(), amount, userAddress)
 	}
 }

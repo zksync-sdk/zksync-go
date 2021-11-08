@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zksync-sdk/zksync-go"
 	"math/big"
@@ -20,14 +19,18 @@ import (
 )
 
 var (
-	masterPkHex           = "0945012b971f943073f6e066581f513c8cd81660bb5a64306d5d092b8df9dd3f"
-	ethNode               = "https://rinkeby.infura.io/v3/511e4b90f71747658a167e9737ed544a"
-	testAmount      int64 = 1000000000000000            // in wei (0.001 ETH)
-	depositAmount   int64 = 500000000000000             // in wei (0.0005 ETH)
-	transferAmount        = big.NewInt(100000000000000) // in wei (0.0001 ETH)
-	withdrawAmount        = big.NewInt(100000000000000) // in wei (0.0001 ETH)
-	txWaitTimeout         = time.Minute * 5
-	txCheckInterval       = time.Second * 2
+	masterPkHex             = "0945012b971f943073f6e066581f513c8cd81660bb5a64306d5d092b8df9dd3f"
+	ethNode                 = "https://rinkeby.infura.io/v3/511e4b90f71747658a167e9737ed544a"
+	testAmount        int64 = 2000000000000000            // in wei (0.002 ETH)
+	testAmountUSDC    int64 = 2000000                     // 2 USDC
+	depositAmount     int64 = 1000000000000000            // in wei (0.001 ETH)
+	depositAmountUSDC int64 = 1000000                     // 1 USDC
+	transferAmount          = big.NewInt(100000000000000) // in wei (0.0001 ETH)
+	withdrawAmount          = big.NewInt(100000000000000) // in wei (0.0001 ETH)
+	swapAmount              = big.NewInt(500000)          // 0.5 USDC
+	txWaitTimeout           = time.Minute * 5
+	txCheckInterval         = time.Second * 2
+	rinkebyUSDCsc           = "0xeb8f08a975ab53e34d8a0330e0d34de942c95926" // USDC smart-contract address on Rinkeby
 
 	err       error
 	ethClient *ethclient.Client
@@ -42,7 +45,7 @@ func TestFullFlow(t *testing.T) {
 	var ep1 zksync.EthProvider
 
 	t.Run("wallet 1", func(t *testing.T) {
-		w, zs := newWallet(t)
+		w, zs := newWallet(t, "")
 		w1 = w
 		ep, err := w.CreateEthereumProvider(ethClient)
 		require.NoError(t, err)
@@ -51,10 +54,21 @@ func TestFullFlow(t *testing.T) {
 
 		//// 0 - fulfill new wallet with some test balance
 		fulfillment(t, w.GetAddress())
+		// also send some USDC
+		fulfillmentUSDC(t, w.GetAddress())
 
 		// 1 - deposit amount to zkSync
 		deposit(t, w, ep)
 		waitZkAccount(t, w.GetProvider(), w.GetAddress())
+
+		// deposit USDC also
+		allTokens, err := w1.GetProvider().GetTokens()
+		require.NoError(t, err)
+		require.NotNil(t, allTokens)
+		usdcToken, err := allTokens.GetToken("USDC")
+		require.NoError(t, err)
+		require.NotNil(t, usdcToken)
+		depositUSDC(t, w1, ep1, usdcToken)
 
 		// 2 - SetAuthPubkeyHash for next ChangePubKeyOnchain
 		state, err := w.GetState()
@@ -86,7 +100,7 @@ func TestFullFlow(t *testing.T) {
 	})
 
 	t.Run("wallet 2", func(t *testing.T) {
-		w, _ := newWallet(t)
+		w, _ := newWallet(t, "")
 		w2 = w
 		ep, err := w.CreateEthereumProvider(ethClient)
 		require.NoError(t, err)
@@ -242,6 +256,13 @@ func TestFullFlow(t *testing.T) {
 	})
 
 	t.Run("swap", func(t *testing.T) {
+		allTokens, err := w1.GetProvider().GetTokens()
+		require.NoError(t, err)
+		require.NotNil(t, allTokens)
+		usdcToken, err := allTokens.GetToken("USDC")
+		require.NoError(t, err)
+		require.NotNil(t, usdcToken)
+
 		fee, err := w1.GetProvider().GetTransactionsBatchFee(
 			[]zksync.TransactionType{zksync.TransactionTypeSwap},
 			[]common.Address{w1.GetAddress()}, zksync.CreateETH())
@@ -252,7 +273,7 @@ func TestFullFlow(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, state1)
 		require.NotNil(t, state1.Committed)
-		o1, err := w1.BuildSignedOrder(w1.GetAddress(), zksync.CreateETH(), zksync.CreateETH(), []*big.Int{big.NewInt(1), big.NewInt(1)}, transferAmount, state1.Committed.Nonce, zksync.DefaultTimeRange())
+		o1, err := w1.BuildSignedOrder(w1.GetAddress(), usdcToken, zksync.CreateETH(), []*big.Int{big.NewInt(1), big.NewInt(10)}, swapAmount, state1.Committed.Nonce, zksync.DefaultTimeRange())
 		require.NoError(t, err)
 		require.NotNil(t, o1)
 
@@ -260,16 +281,15 @@ func TestFullFlow(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, state2)
 		require.NotNil(t, state2.Committed)
-		o2, err := w2.BuildSignedOrder(w2.GetAddress(), zksync.CreateETH(), zksync.CreateETH(), []*big.Int{big.NewInt(1), big.NewInt(1)}, transferAmount, state2.Committed.Nonce, zksync.DefaultTimeRange())
+		o2, err := w2.BuildSignedOrder(w2.GetAddress(), zksync.CreateETH(), usdcToken, []*big.Int{big.NewInt(10), big.NewInt(1)}, big.NewInt(0).Mul(swapAmount, big.NewInt(10)), state2.Committed.Nonce, zksync.DefaultTimeRange())
 		require.NoError(t, err)
 		require.NotNil(t, o2)
 
-		txHash, err := w1.SyncSwap(o1, o2, big.NewInt(1), big.NewInt(1), fee.GetTxFee(zksync.CreateETH()), state1.Committed.Nonce)
+		txHash, err := w1.SyncSwap(o1, o2, o1.Amount, o2.Amount, fee.GetTxFee(zksync.CreateETH()), state1.Committed.Nonce)
 		require.NoError(t, err)
 		require.NotEmpty(t, txHash)
 		err = waitZkTx(w1.GetProvider(), txHash, "SyncSwap")
-		assert.Error(t, err)
-		require.EqualValues(t, "Can't swap the same tokens", err.Error())
+		require.NoError(t, err)
 	})
 
 	// can be tested due to requirements: Target account exists less than required minimum amount (1 hours)
@@ -296,11 +316,14 @@ func TestFullFlow(t *testing.T) {
 
 }
 
-func newWallet(t *testing.T) (*zksync.Wallet, *zksync.ZkSigner) {
-	mnemonic, err := hdwallet.NewMnemonic(160)
-	require.NoError(t, err)
-	require.NotEmpty(t, mnemonic)
-	//mnemonic = "actor feature blade risk rocket behind wide indicate frequent upset session crane tape dentist hundred"
+func newWallet(t *testing.T, mnemonic string) (*zksync.Wallet, *zksync.ZkSigner) {
+	var err error
+	if len(mnemonic) == 0 {
+		mnemonic, err = hdwallet.NewMnemonic(160)
+		require.NoError(t, err)
+		require.NotEmpty(t, mnemonic)
+		//mnemonic = "actor feature blade risk rocket behind wide indicate frequent upset session crane tape dentist hundred"
+	}
 	fmt.Printf("mnemonic - %s\n", mnemonic)
 
 	seed, err := hdwallet.NewSeedFromMnemonic(mnemonic)
@@ -364,12 +387,66 @@ func fulfillment(t *testing.T, toAddress common.Address) {
 	waitEthTx(t, ctx, signedTx.Hash(), "fulfillment")
 }
 
+func fulfillmentUSDC(t *testing.T, toAddress common.Address) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	masterPrivateKey, err := crypto.HexToECDSA(masterPkHex)
+	require.NoError(t, err)
+	masterPublicKey := masterPrivateKey.Public()
+	masterPublicKeyECDSA, ok := masterPublicKey.(*ecdsa.PublicKey)
+	require.True(t, ok)
+	masterAddress := crypto.PubkeyToAddress(*masterPublicKeyECDSA)
+	nonce, err := ethClient.PendingNonceAt(ctx, masterAddress)
+	require.NoError(t, err)
+
+	value := big.NewInt(0) // 0 ETH
+	gasPrice, err := ethClient.SuggestGasPrice(ctx)
+	require.NoError(t, err)
+
+	transferFnSignature := []byte("transfer(address,uint256)")
+	methodID := crypto.Keccak256(transferFnSignature)[:4]
+
+	paddedAddress := common.LeftPadBytes(toAddress.Bytes(), 32)
+	valueUSDC := big.NewInt(testAmountUSDC)
+	paddedAmount := common.LeftPadBytes(valueUSDC.Bytes(), 32)
+
+	var data []byte
+	data = append(data, methodID...)
+	data = append(data, paddedAddress...)
+	data = append(data, paddedAmount...)
+
+	tx := types.NewTransaction(nonce, common.HexToAddress(rinkebyUSDCsc), value, uint64(75000), gasPrice, data)
+
+	chainID, err := ethClient.NetworkID(ctx)
+	require.NoError(t, err)
+
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), masterPrivateKey)
+	require.NoError(t, err)
+
+	err = ethClient.SendTransaction(ctx, signedTx)
+	require.NoError(t, err)
+
+	waitEthTx(t, ctx, signedTx.Hash(), "fulfillment USDC")
+}
+
 func deposit(t *testing.T, w *zksync.Wallet, ep zksync.EthProvider) {
 	tx, err := ep.Deposit(zksync.CreateETH(), big.NewInt(depositAmount), w.GetAddress(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 
 	waitEthTx(t, context.Background(), tx.Hash(), "deposit")
+}
+
+func depositUSDC(t *testing.T, w *zksync.Wallet, ep zksync.EthProvider, token *zksync.Token) {
+	tx1, err := ep.ApproveDeposits(token, big.NewInt(testAmountUSDC), &zksync.GasOptions{GasLimit: 300000})
+	require.NoError(t, err)
+	require.NotNil(t, tx1)
+	waitEthTx(t, context.Background(), tx1.Hash(), "approve deposit USDC")
+
+	tx2, err := ep.Deposit(token, big.NewInt(depositAmountUSDC), w.GetAddress(), &zksync.GasOptions{GasLimit: 300000})
+	require.NoError(t, err)
+	require.NotNil(t, tx2)
+	waitEthTx(t, context.Background(), tx2.Hash(), "deposit USDC")
 }
 
 func waitEthTx(t *testing.T, ctx context.Context, txHash common.Hash, title string) {
