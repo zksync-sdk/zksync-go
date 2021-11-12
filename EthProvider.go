@@ -12,6 +12,8 @@ import (
 	"math/big"
 )
 
+//go:generate mockery -name=EthProvider -output=./ -outpkg=zksync -filename=EthProviderMock_test.go -structname=EthProviderMock -inpkg
+
 type EthProvider interface {
 	ApproveDeposits(token *Token, limit *big.Int, options *GasOptions) (*types.Transaction, error)
 	IsDepositApproved(token *Token, userAddress common.Address, threshold *big.Int) (bool, error)
@@ -68,10 +70,11 @@ func (p *DefaultEthProvider) IsDepositApproved(token *Token, userAddress common.
 
 func (p *DefaultEthProvider) Deposit(token *Token, amount *big.Int, userAddress common.Address, options *GasOptions) (*types.Transaction, error) {
 	auth := p.getAuth(options)
-	auth.Value = amount
 	if token.IsETH() {
+		auth.Value = amount
 		return p.contract.DepositETH(auth, userAddress)
 	} else {
+		auth.Value = nil
 		return p.contract.DepositERC20(auth, token.GetAddress(), amount, userAddress)
 	}
 }

@@ -2,6 +2,14 @@ package zksync
 
 type TransactionType string
 
+type TransactionStatus int
+
+const (
+	TransactionStatusSent TransactionStatus = iota
+	TransactionStatusCommitted
+	TransactionStatusVerified
+)
+
 func (t TransactionType) getType() interface{} {
 	switch t {
 	case TransactionTypeChangePubKeyOnchain, TransactionTypeChangePubKeyECDSA, TransactionTypeChangePubKeyCREATE2:
