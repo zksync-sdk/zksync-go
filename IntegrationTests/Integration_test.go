@@ -472,6 +472,11 @@ func waitEthTx(t *testing.T, ctx context.Context, txHash common.Hash, title stri
 	}
 	require.NoError(t, err)
 	tr, err := ethClient.TransactionReceipt(ctx2, txHash)
+	if err == ethereum.NotFound {
+		// wait a bit and retry once
+		time.Sleep(txCheckInterval)
+		tr, err = ethClient.TransactionReceipt(ctx2, txHash)
+	}
 	require.NoError(t, err)
 	require.EqualValues(t, 1, tr.Status)
 	fmt.Print("DONE\n")
