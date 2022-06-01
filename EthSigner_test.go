@@ -1,6 +1,7 @@
 package zksync
 
 import (
+	"encoding/hex"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 var (
 	ethSigner  *DefaultEthSigner
 	mnemonic   = "kick swallow air vanish path pelican author bring group remove space retire retreat denial sphere"
+	ethPkHex   = "0945012b971f943073f6e066581f513c8cd81660bb5a64306d5d092b8df9dd3f"
 	expAddress = "0xFE64d0cF81848190C18ea5a7ff8d193ac807fd7E"
 
 	mnemonic2 = "timber chronic resemble glide unlock click balance summer beauty cannon intact dwarf cross wrestle super"
@@ -35,6 +37,28 @@ func TestNewEthSignerFromMnemonic(t *testing.T) {
 
 	t.Run("invalid mnemonic", func(t *testing.T) {
 		ethSigner, err := NewEthSignerFromMnemonic("invalid mnemonic")
+		require.Error(t, err)
+		assert.Nil(t, ethSigner)
+	})
+
+}
+
+func TestNewEthSignerFromRawPrivateKey(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		pk, err := hex.DecodeString(ethPkHex)
+		require.NoError(t, err)
+		ethSigner, err = NewEthSignerFromRawPrivateKey(pk)
+		require.NoError(t, err)
+		assert.NotNil(t, ethSigner)
+		assert.IsType(t, &DefaultEthSigner{}, ethSigner)
+		address := ethSigner.GetAddress()
+		assert.NotNil(t, address)
+		assert.IsType(t, common.Address{}, address)
+		assert.EqualValues(t, expAddress, address.String())
+	})
+
+	t.Run("invalid raw pk", func(t *testing.T) {
+		ethSigner, err := NewEthSignerFromRawPrivateKey([]byte{1, 2, 3})
 		require.Error(t, err)
 		assert.Nil(t, ethSigner)
 	})

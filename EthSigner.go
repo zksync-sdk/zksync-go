@@ -1,10 +1,12 @@
 package zksync
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/pkg/errors"
 	"math/big"
@@ -22,8 +24,8 @@ type EthSigner interface {
 }
 
 type DefaultEthSigner struct {
-	wallet  *hdwallet.Wallet
-	account accounts.Account
+	pk      *ecdsa.PrivateKey
+	address common.Address
 }
 
 func NewEthSignerFromMnemonic(mnemonic string) (*DefaultEthSigner, error) {
@@ -43,20 +45,37 @@ func NewEthSignerFromMnemonicAndAccountId(mnemonic string, accountId uint32) (*D
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to derive account from HD wallet")
 	}
+	pk, err := wallet.PrivateKey(account)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get account's private key from HD wallet")
+	}
+	pub := pk.Public().(*ecdsa.PublicKey)
 	return &DefaultEthSigner{
-		wallet:  wallet,
-		account: account,
+		pk:      pk,
+		address: crypto.PubkeyToAddress(*pub),
+	}, nil
+}
+
+func NewEthSignerFromRawPrivateKey(rawPk []byte) (*DefaultEthSigner, error) {
+	pk, err := crypto.ToECDSA(rawPk)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid raw private key")
+	}
+	pub := pk.Public().(*ecdsa.PublicKey)
+	return &DefaultEthSigner{
+		pk:      pk,
+		address: crypto.PubkeyToAddress(*pub),
 	}, nil
 }
 
 func (s *DefaultEthSigner) GetAddress() common.Address {
-	return s.account.Address
+	return s.address
 }
 
 func (s *DefaultEthSigner) SignMessage(msg []byte) ([]byte, error) {
-	sig, err := s.wallet.SignText(s.account, msg) // prefixed
+	sig, err := s.SignHash(accounts.TextHash(msg)) // prefixed
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to sign message by wallet")
+		return nil, errors.Wrap(err, "failed to sign message")
 	}
 	// set recovery byte to 27/28
 	if len(sig) == 65 {
@@ -66,9 +85,9 @@ func (s *DefaultEthSigner) SignMessage(msg []byte) ([]byte, error) {
 }
 
 func (s *DefaultEthSigner) SignHash(msg []byte) ([]byte, error) {
-	sig, err := s.wallet.SignHash(s.account, msg) // prefixed
+	sig, err := crypto.Sign(msg, s.pk)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to sign message by wallet")
+		return nil, errors.Wrap(err, "failed to sign hash")
 	}
 	return sig, nil
 }
