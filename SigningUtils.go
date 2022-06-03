@@ -143,7 +143,66 @@ func uint64ToBitsLE(v uint64, size uint) *Bits {
 	return res
 }
 
-func getChangePubKeyData(txData *ChangePubKey) ([]byte, error) {
+func GetSignMessage(tx ZksTransaction, token *Token, fee *big.Int) (string, error) {
+	switch tx.getType() {
+	case "Transfer":
+		if txData, ok := tx.(*Transfer); ok {
+			var tokenToUse *Token
+			if txData.Token != nil {
+				tokenToUse = txData.Token
+			} else {
+				tokenToUse = token
+			}
+			fee, ok := big.NewInt(0).SetString(txData.Fee, 10)
+			if !ok {
+				return "", errors.New("failed to convert string fee to big.Int")
+			}
+			msg, err := getTransferMessagePart(txData.To.String(), txData.Amount, fee, tokenToUse)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get Transfer message part")
+			}
+			return msg, nil
+		}
+	case "Withdraw":
+		if txData, ok := tx.(*Withdraw); ok {
+			msg, err := getWithdrawMessagePart(txData.To.String(), txData.Amount, fee, token)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get Withdraw message part")
+			}
+			return msg, nil
+		}
+	case "ForcedExit":
+		if txData, ok := tx.(*ForcedExit); ok {
+			msg, err := getForcedExitMessagePart(txData.Target.String(), fee, token)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get ForcedExit message part")
+			}
+			return msg, nil
+		}
+	case "MintNFT":
+		if txData, ok := tx.(*MintNFT); ok {
+			msg, err := getMintNFTMessagePart(txData.ContentHash, txData.Recipient.String(), fee, token)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get MintNFT message part")
+			}
+			return msg, nil
+		}
+	case "WithdrawNFT":
+		if txData, ok := tx.(*WithdrawNFT); ok {
+			msg, err := getWithdrawNFTMessagePart(txData.To.String(), txData.Token, fee, token)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get WithdrawNFT message part")
+			}
+			return msg, nil
+		}
+	case "Swap":
+		msg := getSwapMessagePart(token, fee)
+		return msg, nil
+	}
+	return "", errors.New("unknown tx type")
+}
+
+func GetChangePubKeyData(txData *ChangePubKey) ([]byte, error) {
 	buf := bytes.Buffer{}
 	pkhBytes, err := pkhToBytes(txData.NewPkHash)
 	if err != nil {
@@ -211,7 +270,7 @@ func getWithdrawNFTMessagePart(to string, tokenId uint32, fee *big.Int, token *T
 	return res, nil
 }
 
-func getOrderMessagePart(recipient string, amount *big.Int, sell, buy *Token, ratio []*big.Int) (string, error) {
+func GetOrderMessagePart(recipient string, amount *big.Int, sell, buy *Token, ratio []*big.Int) (string, error) {
 	if len(ratio) != 2 {
 		return "", errors.New("invalid ratio")
 	}
@@ -229,6 +288,6 @@ func getSwapMessagePart(token *Token, fee *big.Int) string {
 	return fmt.Sprintf("Swap fee: %s %s", token.ToDecimalString(fee), token.Symbol)
 }
 
-func getNonceMessagePart(nonce uint32) string {
+func GetNonceMessagePart(nonce uint32) string {
 	return fmt.Sprintf("Nonce: %d", nonce)
 }
