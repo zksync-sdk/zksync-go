@@ -28,7 +28,7 @@ var (
 	transferAmount          = big.NewInt(100000000000000) // in wei (0.0001 ETH)
 	withdrawAmount          = big.NewInt(100000000000000) // in wei (0.0001 ETH)
 	swapAmount              = big.NewInt(500000)          // 0.5 USDC
-	txWaitTimeout           = time.Minute * 5
+	txWaitTimeout           = time.Minute * 15
 	txCheckInterval         = time.Second * 2
 	rinkebyUSDCsc           = "0xeb8f08a975ab53e34d8a0330e0d34de942c95926" // USDC smart-contract address on Rinkeby
 
