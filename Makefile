@@ -12,7 +12,7 @@ tests: download
 	CGO_LDFLAGS="-L./libs" LD_LIBRARY_PATH="./libs" go test -race -v -count=1 .
 
 integration-test: download
-	CGO_LDFLAGS="-L./libs" LD_LIBRARY_PATH="../libs" go test -race -v -count=1 ./IntegrationTests
+	CGO_LDFLAGS="-L./libs" LD_LIBRARY_PATH="../libs" go test -race -v -count=1 -timeout=30m ./IntegrationTests
 
 generate:
 	go install github.com/vektra/mockery/cmd/mockery
