@@ -4,13 +4,14 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/pkg/errors"
-	"math/big"
-	"strings"
+	hdwallet "github.com/stephenlacy/go-ethereum-hdwallet"
 )
 
 type EthSigner interface {
